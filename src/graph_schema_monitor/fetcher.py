@@ -190,7 +190,7 @@ def fetch_snapshot(
 
 def _validate_allowlisted_url(url: str) -> None:
     parsed = parse.urlparse(url)
-    if parsed.scheme != "https" or parsed.hostname != ALLOWED_HOST:
+    if parsed.scheme != "https" or parsed.hostname != ALLOWED_HOST or url not in PROFILE_URLS.values():
         raise FetchError(f"URL is outside the allowed HTTPS Graph boundary: {url}.")
 
 
