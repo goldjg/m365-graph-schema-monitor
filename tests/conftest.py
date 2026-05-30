@@ -16,8 +16,13 @@ if str(SRC) not in sys.path:
 
 @pytest.fixture(autouse=True)
 def block_live_network(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    def _blocked_open(self: request.OpenerDirector, fullurl: object, data: object = None, timeout: object = None) -> object:
+    def _raise_on_live_network_access(
+        self: request.OpenerDirector,
+        fullurl: object,
+        data: object = None,
+        timeout: object = None,
+    ) -> object:
         raise AssertionError(f"Live network access is not allowed in tests: {fullurl}")
 
-    monkeypatch.setattr(request.OpenerDirector, "open", _blocked_open)
+    monkeypatch.setattr(request.OpenerDirector, "open", _raise_on_live_network_access)
     yield

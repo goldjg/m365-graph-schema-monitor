@@ -153,7 +153,7 @@ def fetch_snapshot(
         raise
     except error.URLError as exc:
         reason = exc.reason
-        if isinstance(reason, TimeoutError | socket.timeout):
+        if isinstance(reason, (TimeoutError, socket.timeout)):
             raise NetworkFailureError(f"Network timeout after {timeout} seconds.") from exc
         raise NetworkFailureError(f"Network error: {reason}.") from exc
     except socket.timeout as exc:
@@ -190,7 +190,11 @@ def fetch_snapshot(
 
 def _validate_allowlisted_url(url: str) -> None:
     parsed = parse.urlparse(url)
-    if parsed.scheme != "https" or parsed.hostname != ALLOWED_HOST or url not in PROFILE_URLS.values():
+    if parsed.scheme != "https":
+        raise FetchError(f"URL must use HTTPS: {url}.")
+    if parsed.hostname != ALLOWED_HOST:
+        raise FetchError(f"URL host is outside the allowed Graph boundary: {url}.")
+    if url not in PROFILE_URLS.values():
         raise FetchError(f"URL is outside the allowed HTTPS Graph boundary: {url}.")
 
 

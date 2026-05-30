@@ -73,7 +73,7 @@ class FakeOpener:
     def __init__(self, response: FakeResponse | Exception) -> None:
         self._response = response
 
-    def open(self, url: str, timeout: int = 30) -> FakeResponse:
+    def open(self, url: str, data: object = None, timeout: int = 30) -> FakeResponse:
         if isinstance(self._response, Exception):
             raise self._response
         return self._response
