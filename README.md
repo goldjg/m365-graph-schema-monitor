@@ -1,38 +1,47 @@
 # m365-graph-schema-monitor
 
-`m365-graph-schema-monitor` is an offline-first tool for inspecting Microsoft Graph-like CSDL snapshots and diffing schema changes.
+`m365-graph-schema-monitor` is an offline-first tool for acquiring Microsoft Graph metadata snapshots, inspecting CSDL types, and diffing schema changes.
 
 ## Why this exists
 
-Microsoft Graph schema changes can affect governance, drift detection, and identity/security tooling before those changes are easy to spot in downstream documentation. This project starts with deterministic local parsing and diffing so schema evolution is visible from snapshot files alone.
+Microsoft Graph schema changes can affect governance, drift detection, and identity/security tooling before those changes are easy to spot in downstream documentation. This project uses deterministic local parsing and diffing, with a tightly constrained snapshot fetch step for public Graph metadata.
 
-## PR1 scope (intentionally offline)
-
-PR1 includes:
-
-- Local CSDL/XML parsing for `EntityType` and `ComplexType` properties.
-- Deterministic property-level schema diffs.
-- A minimal CLI (`inspect`, `diff`).
-- Hand-authored local fixtures and offline tests.
-
-PR1 does **not** include:
-
-- Live Graph metadata fetch
-- Any network access
-- Authentication or tenant access
-- Scheduler jobs
-- Database/storage backends
-- Web UI
-- Changelog/docs commit correlation
-- Canary tenant logic
-- AI summarization
-
-## Usage
+## Installation / setup
 
 From repository root:
 
 ```bash
 python -m pip install -e ".[dev]"
+```
+
+## Workflow
+
+Fetch a local snapshot, inspect one type, then diff two snapshots:
+
+```bash
+python -m graph_schema_monitor fetch --profile v1.0 --out /tmp/graph-v1.xml --overwrite
+python -m graph_schema_monitor fetch --profile beta --out /tmp/graph-beta.xml --overwrite
+python -m graph_schema_monitor inspect --snapshot /tmp/graph-v1.xml --type microsoft.graph.conditionalAccessPolicy
+python -m graph_schema_monitor diff --old /tmp/graph-v1.xml --new /tmp/graph-beta.xml --type microsoft.graph.conditionalAccessPolicy
+```
+
+## Network boundary
+
+`fetch` is intentionally constrained:
+
+- Fixed Graph endpoints only:
+  - `https://graph.microsoft.com/v1.0/$metadata`
+  - `https://graph.microsoft.com/beta/$metadata`
+- No authentication
+- No tenant data or permissions
+- No arbitrary URLs
+- No redirect following
+- Sidecar metadata includes only the explicit allowlisted fields
+
+## CLI usage
+
+```bash
+python -m graph_schema_monitor fetch --profile v1.0 --out /tmp/graph-v1.xml --overwrite
 python -m graph_schema_monitor inspect --snapshot tests/fixtures/schema_old.xml --type microsoft.graph.conditionalAccessPolicy
 python -m graph_schema_monitor diff --old tests/fixtures/schema_old.xml --new tests/fixtures/schema_new.xml --type microsoft.graph.conditionalAccessPolicy
 python -m graph_schema_monitor diff --old tests/fixtures/schema_old.xml --new tests/fixtures/schema_new.xml --format json
@@ -48,10 +57,11 @@ python -m pytest tests/
 
 - Parser scope is intentionally limited to `EntityType` and `ComplexType` declared properties.
 - Diff identity is `fully-qualified-type-name + property-name` (declared-only, no inheritance flattening).
-- No online collection or changelog correlation in PR1.
+- `fetch` only supports the `v1.0` and `beta` public Graph `$metadata` endpoints.
+- No authentication, tenant access, OAuth, MSAL, or Graph SDK integration.
+- No arbitrary URL input, scheduler, database, web UI, changelog correlation, canary tenant logic, or AI summarization.
 
-## Roadmap (post-PR1)
+## Roadmap
 
-- Add snapshot acquisition workflow with explicit trust and auth boundaries.
 - Expand parser coverage for additional OData surfaces if needed.
 - Add richer output/reporting surfaces while preserving deterministic core behavior.

@@ -6,6 +6,7 @@ import sys
 from typing import Sequence
 
 from .diff import changes_to_json, diff_snapshots, render_changes_text
+from .fetcher import FetchError, fetch_snapshot
 from .parser import parse_csdl_file
 
 
@@ -28,6 +29,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default="text",
         help="Output format",
     )
+
+    fetch_parser = subparsers.add_parser("fetch", help="Fetch a Graph metadata snapshot")
+    fetch_parser.add_argument("--profile", required=True, help="Graph metadata profile: v1.0 or beta")
+    fetch_parser.add_argument("--out", required=True, dest="output_path", help="Output path for XML snapshot")
+    fetch_parser.add_argument("--overwrite", action="store_true", help="Overwrite existing output files")
 
     return parser
 
@@ -65,14 +71,31 @@ def _diff(args: argparse.Namespace) -> int:
     return 0
 
 
+def _fetch(args: argparse.Namespace) -> int:
+    result = fetch_snapshot(
+        args.profile,
+        args.output_path,
+        overwrite=args.overwrite,
+    )
+    print(f"Fetched {result.source_url} -> {result.output_path}")
+    print(f"Sidecar: {result.sidecar_path}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    if args.command == "inspect":
-        return _inspect(args)
-    if args.command == "diff":
-        return _diff(args)
+    try:
+        if args.command == "inspect":
+            return _inspect(args)
+        if args.command == "diff":
+            return _diff(args)
+        if args.command == "fetch":
+            return _fetch(args)
+    except FetchError as exc:
+        print(str(exc), file=sys.stderr)
+        return exc.exit_code
 
     parser.print_help()
     return 2
