@@ -79,25 +79,16 @@ class WriteFailureError(FetchError):
 
 
 class _NoRedirectHandler(request.HTTPRedirectHandler):
-    def _reject(self, headers: Any) -> None:
-        location = headers.get("Location")
-        target = f" to {location}" if location else ""
-        raise RedirectNotAllowedError(f"Redirects are not allowed{target}.")
+    def _reject(self) -> None:
+        raise RedirectNotAllowedError("Redirects are not allowed.")
 
     def http_error_301(self, req: Any, fp: Any, code: int, msg: str, headers: Any) -> Any:
-        self._reject(headers)
+        self._reject()
 
-    def http_error_302(self, req: Any, fp: Any, code: int, msg: str, headers: Any) -> Any:
-        self._reject(headers)
-
-    def http_error_303(self, req: Any, fp: Any, code: int, msg: str, headers: Any) -> Any:
-        self._reject(headers)
-
-    def http_error_307(self, req: Any, fp: Any, code: int, msg: str, headers: Any) -> Any:
-        self._reject(headers)
-
-    def http_error_308(self, req: Any, fp: Any, code: int, msg: str, headers: Any) -> Any:
-        self._reject(headers)
+    http_error_302 = http_error_301
+    http_error_303 = http_error_301
+    http_error_307 = http_error_301
+    http_error_308 = http_error_301
 
 
 def build_url_opener() -> request.OpenerDirector:

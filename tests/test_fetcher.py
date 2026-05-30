@@ -196,7 +196,7 @@ def test_fetch_snapshot_output_parses_with_existing_parser(tmp_path: Path) -> No
     assert "microsoft.graph.conditionalAccessPolicy" in snapshot.types
 
 
-def test_cli_fetch_writes_files_with_mocked_network(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+def test_cli_fetch_writes_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     output_path = tmp_path / "snapshot.xml"
     monkeypatch.setattr(
         "graph_schema_monitor.fetcher.build_url_opener",
