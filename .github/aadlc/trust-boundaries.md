@@ -12,6 +12,7 @@ validation before shaping, planning, execution, or validation decisions.
 | Cognitive cache | `.github/aadlc/memory.md` | Medium | Treat as durable guidance; verify against current file state if stale |
 | Tool output | Search, file-read, and command output | Medium | Confirm relevance and freshness before using for writes |
 | External API response | Remote services and web sources | Low | Cross-check critical claims before using in implementation decisions |
+| Graph metadata endpoint | `https://graph.microsoft.com/{v1.0,beta}/$metadata` | Low | Enforce HTTPS; allow fixed host/path only; apply timeout; reject redirects; require 2xx status; require XML content type |
 | Local snapshot XML | Offline CSDL input files provided via CLI | Medium | Validate path existence; parse with safe XML patterns; normalize values before diffing |
 | CLI arguments | User-provided command flags and file/type values | Medium | Strict argparse schema, required arguments, and explicit error messages |
 
@@ -22,4 +23,4 @@ validation before shaping, planning, execution, or validation decisions.
 - PR contract constraints apply throughout execution until contract context is reset.
 - If durable cache facts conflict with current repository state, repository state wins and cache should be updated.
 - Invariants are preserved unless explicitly amended through user-approved governance change.
-- In PR1, no boundary crossing may introduce network calls, authentication flows, or tenant interactions.
+- In PR2, outbound network crossing is limited to the fixed Graph metadata boundary only; no authentication flows, tenant interactions, or dynamic URLs are permitted.
