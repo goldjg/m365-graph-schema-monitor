@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:DataServices>
+    <Schema Namespace="microsoft.graph" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityType Name="conditionalAccessPolicy">
+        <Property Name="id" Type="Edm.String" Nullable="false" />
+        <Property Name="displayName" Type="Edm.String" Nullable="true" />
+        <Property Name="state" Type="microsoft.graph.conditionalAccessPolicyState" Nullable="false" />
+        <Property Name="conditions" Type="microsoft.graph.conditionalAccessConditionSet" Nullable="false" />
+        <Property Name="templateId" Type="Edm.String" Nullable="true" />
+      </EntityType>
+      <ComplexType Name="conditionalAccessConditionSet">
+        <Property Name="users" Type="microsoft.graph.conditionalAccessUsers" Nullable="true" />
+        <Property Name="applications" Type="microsoft.graph.conditionalAccessApplications" />
+        <Property Name="includeRoles" Type="Collection(Edm.String)" />
+        <Property Name="clientApplications" Type="microsoft.graph.conditionalAccessClientApplications" Nullable="true" />
+      </ComplexType>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>
