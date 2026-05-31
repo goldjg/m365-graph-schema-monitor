@@ -74,6 +74,12 @@ The following files may be reviewed to preserve existing contracts and invariant
 - `.github/aadlc/memory.md`
 - `.github/aadlc/trust-boundaries.md`
 - `.github/aadlc/invariants.yml`
+## Contract assertions
+- PR3 `report diff --format json` top-level fields remain present and unchanged.
+- `report diff --change-type` and `report diff --type-prefix` filter changes deterministically.
+- `report diff --limit` applies after filtering while preserving stable change order.
+- `report summary` counts by change type match the full unfiltered diff.
+- PR4 report filtering and summary rendering introduce no new network behaviour.
 ## Tests / validation
 - Run `python -m pytest tests/`.
 - Confirm existing `fetch`, `inspect`, top-level `diff`, `snapshots list`, `snapshots validate`, and unfiltered `report diff` behavior still pass unchanged.
