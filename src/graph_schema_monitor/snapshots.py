@@ -223,7 +223,7 @@ def _load_snapshot_sidecar_result(
     warnings: list[str] = []
     if extra_fields:
         extras = ", ".join(extra_fields)
-        warnings.append(f"extra sidecar field(s) ignored: {extras}: {resolved_sidecar_path}")
+        warnings.append(f"extra sidecar field(s) ignored: {extras}")
 
     profile = _require_str(payload, "profile", resolved_sidecar_path)
     source_url = _require_str(payload, "source_url", resolved_sidecar_path)

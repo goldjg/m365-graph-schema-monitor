@@ -160,9 +160,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _write_output_file(path: Path, content: str) -> None:
     temp_path: str | None = None
     try:
+        existing_mode = path.stat().st_mode if path.exists() else None
         fd, temp_path = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(content)
+        if existing_mode is not None:
+            os.chmod(temp_path, existing_mode)
         os.replace(temp_path, path)
     except OSError as exc:
         if temp_path is not None:

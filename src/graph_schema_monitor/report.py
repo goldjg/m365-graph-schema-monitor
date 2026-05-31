@@ -96,7 +96,11 @@ def _format_value(value: Any) -> str:
 
 def _render_group(change_type: str, changes: list[DiffChange]) -> list[str]:
     if change_type in {"type_added", "type_removed"}:
-        return [f"- `{change.type_name}`: `{_format_value(change.new_value if change.old_value is None else change.old_value)}`" for change in changes]
+        lines: list[str] = []
+        for change in changes:
+            value = change.new_value if change.old_value is None else change.old_value
+            lines.append(f"- `{change.type_name}`: `{_format_value(value)}`")
+        return lines
 
     return [
         "- "
