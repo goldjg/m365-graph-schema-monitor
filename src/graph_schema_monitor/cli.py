@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Sequence
 
@@ -69,7 +71,7 @@ def _build_parser() -> argparse.ArgumentParser:
     report_diff_parser.add_argument(
         "--format",
         dest="output_format",
-        choices=["markdown"],
+        choices=["markdown", "json"],
         default="markdown",
         help="Report output format",
     )
@@ -136,9 +138,9 @@ def _snapshots_validate(args: argparse.Namespace) -> int:
 
 
 def _report_diff(args: argparse.Namespace) -> int:
-    report = build_diff_report(args.old_snapshot, args.new_snapshot)
+    report = build_diff_report(args.old_snapshot, args.new_snapshot, output_format=args.output_format)
     if args.output_path:
-        Path(args.output_path).write_text(report + "\n", encoding="utf-8")
+        _write_output_file(Path(args.output_path), report + "\n")
         return 0
     print(report)
     return 0
@@ -153,3 +155,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (FetchError, SnapshotValidationError) as exc:
         print(str(exc), file=sys.stderr)
         return exc.exit_code
+
+
+def _write_output_file(path: Path, content: str) -> None:
+    temp_path: str | None = None
+    try:
+        fd, temp_path = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        os.replace(temp_path, path)
+    except OSError as exc:
+        if temp_path is not None:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+        raise SnapshotValidationError(f"Failed to write file: {path}.") from exc

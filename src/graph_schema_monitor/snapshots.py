@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -29,7 +29,7 @@ class SnapshotBundle:
     snapshot_path: Path
     sidecar_path: Path
     snapshot: SchemaSnapshot
-    sidecar: SnapshotSidecar
+    sidecar: SnapshotSidecar | None
 
 
 @dataclass(frozen=True)
@@ -40,6 +40,7 @@ class SnapshotInspection:
     type_count: int | None
     sidecar: SnapshotSidecar | None
     errors: tuple[str, ...]
+    warnings: tuple[str, ...] = ()
 
     @property
     def status(self) -> str:
@@ -54,18 +55,39 @@ def sidecar_path_for_snapshot(snapshot_path: str | Path) -> Path:
     return Path(f"{Path(snapshot_path)}.json")
 
 
-def discover_snapshot_paths(directory: str | Path) -> tuple[Path, list[Path]]:
+def discover_snapshot_paths(directory: str | Path) -> tuple[Path, list[Path], list[Path]]:
     root = Path(directory)
     if not root.exists() or not root.is_dir():
         raise SnapshotValidationError(f"Snapshot directory does not exist: {root}")
-    candidates = (path for path in root.rglob("*.xml") if path.is_file())
-    snapshots = sorted(candidates, key=lambda path: path.relative_to(root).as_posix())
-    return root, snapshots
+    snapshot_candidates = (path for path in root.rglob("*.xml") if path.is_file())
+    sidecar_candidates = (path for path in root.rglob("*.xml.json") if path.is_file())
+    snapshots = sorted(snapshot_candidates, key=lambda path: path.relative_to(root).as_posix())
+    sidecars = sorted(sidecar_candidates, key=lambda path: path.relative_to(root).as_posix())
+    return root, snapshots, sidecars
 
 
 def inspect_snapshot_directory(directory: str | Path) -> list[SnapshotInspection]:
-    root, snapshots = discover_snapshot_paths(directory)
-    return [inspect_snapshot_file(path, root=root) for path in snapshots]
+    root, snapshots, sidecars = discover_snapshot_paths(directory)
+    inspections = [inspect_snapshot_file(path, root=root) for path in snapshots]
+
+    snapshot_paths = set(snapshots)
+    for sidecar_path in sidecars:
+        snapshot_path = sidecar_path.with_suffix("")
+        if snapshot_path in snapshot_paths:
+            continue
+        inspections.append(
+            SnapshotInspection(
+                relative_path=sidecar_path.relative_to(root).as_posix(),
+                snapshot_path=snapshot_path,
+                sidecar_path=sidecar_path,
+                type_count=None,
+                sidecar=None,
+                errors=(f"orphan sidecar: {sidecar_path}",),
+            )
+        )
+
+    inspections = _apply_duplicate_errors(inspections)
+    return sorted(inspections, key=_inspection_sort_key)
 
 
 def inspect_snapshot_file(snapshot_path: str | Path, *, root: Path | None = None) -> SnapshotInspection:
@@ -73,6 +95,7 @@ def inspect_snapshot_file(snapshot_path: str | Path, *, root: Path | None = None
     display_path = path.relative_to(root).as_posix() if root is not None else str(path)
     sidecar_path = sidecar_path_for_snapshot(path)
     errors: list[str] = []
+    warnings: list[str] = []
     type_count: int | None = None
     sidecar: SnapshotSidecar | None = None
 
@@ -86,7 +109,8 @@ def inspect_snapshot_file(snapshot_path: str | Path, *, root: Path | None = None
         errors.append(f"missing sidecar: {sidecar_path}")
     else:
         try:
-            sidecar = load_snapshot_sidecar(path, sidecar_path=sidecar_path)
+            sidecar, sidecar_warnings = _load_snapshot_sidecar_result(path, sidecar_path=sidecar_path)
+            warnings.extend(sidecar_warnings)
         except SnapshotValidationError as exc:
             errors.append(str(exc))
 
@@ -97,14 +121,20 @@ def inspect_snapshot_file(snapshot_path: str | Path, *, root: Path | None = None
         type_count=type_count,
         sidecar=sidecar,
         errors=tuple(errors),
+        warnings=tuple(warnings),
     )
 
 
-def load_snapshot_bundle(snapshot_path: str | Path) -> SnapshotBundle:
+def load_snapshot_bundle(snapshot_path: str | Path, *, allow_missing_sidecar: bool = False) -> SnapshotBundle:
     path = Path(snapshot_path)
     sidecar_path = sidecar_path_for_snapshot(path)
     if not sidecar_path.exists() or not sidecar_path.is_file():
-        raise SnapshotValidationError(f"Missing sidecar for snapshot: {path}")
+        if allow_missing_sidecar:
+            sidecar = None
+        else:
+            raise SnapshotValidationError(f"Missing sidecar for snapshot: {path}")
+    else:
+        sidecar = load_snapshot_sidecar(path, sidecar_path=sidecar_path)
 
     try:
         snapshot = parse_csdl_file(path)
@@ -115,7 +145,7 @@ def load_snapshot_bundle(snapshot_path: str | Path) -> SnapshotBundle:
         snapshot_path=path,
         sidecar_path=sidecar_path,
         snapshot=snapshot,
-        sidecar=load_snapshot_sidecar(path, sidecar_path=sidecar_path),
+        sidecar=sidecar,
     )
 
 
@@ -147,6 +177,8 @@ def render_snapshot_validation(inspections: list[SnapshotInspection]) -> str:
 
     lines: list[str] = []
     for inspection in inspections:
+        for warning in inspection.warnings:
+            lines.append(f"WARNING\t{inspection.relative_path}\t{warning}")
         if not inspection.errors:
             lines.append(f"OK\t{inspection.relative_path}")
             continue
@@ -160,6 +192,15 @@ def has_snapshot_errors(inspections: list[SnapshotInspection]) -> bool:
 
 
 def load_snapshot_sidecar(snapshot_path: str | Path, *, sidecar_path: str | Path | None = None) -> SnapshotSidecar:
+    sidecar, _warnings = _load_snapshot_sidecar_result(snapshot_path, sidecar_path=sidecar_path)
+    return sidecar
+
+
+def _load_snapshot_sidecar_result(
+    snapshot_path: str | Path,
+    *,
+    sidecar_path: str | Path | None = None,
+) -> tuple[SnapshotSidecar, tuple[str, ...]]:
     snapshot_file = Path(snapshot_path)
     resolved_sidecar_path = Path(sidecar_path) if sidecar_path is not None else sidecar_path_for_snapshot(snapshot_file)
 
@@ -173,12 +214,16 @@ def load_snapshot_sidecar(snapshot_path: str | Path, *, sidecar_path: str | Path
     if not isinstance(payload, dict):
         raise SnapshotValidationError(f"sidecar must be a JSON object: {resolved_sidecar_path}")
 
-    expected_fields = list(ALLOWED_SIDECAR_FIELDS)
-    actual_fields = list(payload)
-    if actual_fields != expected_fields:
-        raise SnapshotValidationError(
-            f"sidecar fields must match allowlist order {expected_fields}: {resolved_sidecar_path}"
-        )
+    missing_fields = [field for field in ALLOWED_SIDECAR_FIELDS if field not in payload]
+    if missing_fields:
+        missing = ", ".join(missing_fields)
+        raise SnapshotValidationError(f"sidecar missing required field(s): {missing}: {resolved_sidecar_path}")
+
+    extra_fields = sorted(field for field in payload if field not in ALLOWED_SIDECAR_FIELDS)
+    warnings: list[str] = []
+    if extra_fields:
+        extras = ", ".join(extra_fields)
+        warnings.append(f"extra sidecar field(s) ignored: {extras}: {resolved_sidecar_path}")
 
     profile = _require_str(payload, "profile", resolved_sidecar_path)
     source_url = _require_str(payload, "source_url", resolved_sidecar_path)
@@ -212,16 +257,19 @@ def load_snapshot_sidecar(snapshot_path: str | Path, *, sidecar_path: str | Path
             f"sidecar sha256 does not match snapshot content: {resolved_sidecar_path}"
         )
 
-    return SnapshotSidecar(
-        profile=profile,
-        source_url=source_url,
-        fetched_at_utc=fetched_at_utc,
-        status_code=status_code,
-        content_type=content_type,
-        etag=etag,
-        last_modified=last_modified,
-        sha256=sha256,
-        x_ms_schema_version=x_ms_schema_version,
+    return (
+        SnapshotSidecar(
+            profile=profile,
+            source_url=source_url,
+            fetched_at_utc=fetched_at_utc,
+            status_code=status_code,
+            content_type=content_type,
+            etag=etag,
+            last_modified=last_modified,
+            sha256=sha256,
+            x_ms_schema_version=x_ms_schema_version,
+        ),
+        tuple(warnings),
     )
 
 
@@ -246,3 +294,35 @@ def _parse_utc_timestamp(value: str, sidecar_path: Path) -> None:
         datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as exc:
         raise SnapshotValidationError(f"sidecar fetched_at_utc must be ISO-8601 UTC: {sidecar_path}") from exc
+
+
+def _inspection_sort_key(inspection: SnapshotInspection) -> tuple[str, str, str, str]:
+    profile = inspection.sidecar.profile if inspection.sidecar is not None else "\uffff"
+    fetched_at_utc = inspection.sidecar.fetched_at_utc if inspection.sidecar is not None else "\uffff"
+    xml_path = inspection.relative_path if inspection.relative_path.endswith(".xml") else inspection.snapshot_path.name
+    return (profile, fetched_at_utc, xml_path, inspection.relative_path)
+
+
+def _apply_duplicate_errors(inspections: list[SnapshotInspection]) -> list[SnapshotInspection]:
+    grouped: dict[tuple[str, str, str], list[int]] = {}
+    for index, inspection in enumerate(inspections):
+        if inspection.sidecar is None:
+            continue
+        key = (
+            inspection.sidecar.profile,
+            inspection.sidecar.fetched_at_utc,
+            inspection.sidecar.sha256,
+        )
+        grouped.setdefault(key, []).append(index)
+
+    updated = list(inspections)
+    for key, indexes in grouped.items():
+        if len(indexes) < 2:
+            continue
+        message = (
+            "duplicate snapshot metadata tuple "
+            f"(profile={key[0]!r}, fetched_at_utc={key[1]!r}, sha256={key[2]!r})"
+        )
+        for index in indexes:
+            updated[index] = replace(updated[index], errors=updated[index].errors + (message,))
+    return updated

@@ -141,8 +141,35 @@ def test_cli_report_diff_writes_to_stdout(tmp_path: Path, capsys: pytest.Capture
 
     captured = capsys.readouterr()
     assert exit_code == 0
-    assert "# Graph schema diff report" in captured.out
+    assert "# Graph Schema Diff Report" in captured.out
     assert "microsoft.graph.conditionalAccessPolicy.templateId" in captured.out
+
+
+def test_cli_report_diff_supports_json_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+
+    exit_code = cli.main(
+        ["report", "diff", "--old", str(old_snapshot), "--new", str(new_snapshot), "--format", "json"]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    payload = json.loads(captured.out)
+    assert payload["metadata"]["old_snapshot"]["profile"] == "v1.0"
+    assert any(item["property_name"] == "templateId" for item in payload["changes"])
 
 
 def test_cli_report_diff_writes_to_file(tmp_path: Path) -> None:
@@ -168,4 +195,4 @@ def test_cli_report_diff_writes_to_file(tmp_path: Path) -> None:
 
     assert exit_code == 0
     assert output_path.exists()
-    assert "# Graph schema diff report" in output_path.read_text(encoding="utf-8")
+    assert "# Graph Schema Diff Report" in output_path.read_text(encoding="utf-8")
