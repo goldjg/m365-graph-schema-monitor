@@ -37,6 +37,7 @@ from .watchlists import (
     render_watchlist_json_report,
     render_watchlist_markdown_report,
 )
+from .workflows import build_compare_public_auth_bundle
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -225,6 +226,51 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     version_compare_sources_parser.set_defaults(handler=_version_compare_sources)
 
+    workflow_parser = subparsers.add_parser("workflow", help="Local evidence workflow bundle commands")
+    workflow_subparsers = workflow_parser.add_subparsers(dest="workflow_command", required=True)
+
+    compare_pa_parser = workflow_subparsers.add_parser(
+        "compare-public-auth",
+        help="Bundle a public-vs-authenticated evidence report directory",
+    )
+    compare_pa_parser.add_argument(
+        "--public",
+        required=True,
+        dest="public_snapshot",
+        help="Path to public/unauthenticated metadata snapshot XML",
+    )
+    compare_pa_parser.add_argument(
+        "--authenticated",
+        required=True,
+        dest="authenticated_snapshot",
+        help="Path to authenticated metadata snapshot XML",
+    )
+    compare_pa_parser.add_argument(
+        "--out-dir",
+        required=True,
+        dest="out_dir",
+        help="Output directory for the evidence bundle",
+    )
+    compare_pa_parser.add_argument(
+        "--watchlist",
+        dest="watchlist_path",
+        default=None,
+        help="Optional path to local watchlist JSON",
+    )
+    compare_pa_parser.add_argument(
+        "--allow-profile-mismatch",
+        dest="allow_profile_mismatch",
+        action="store_true",
+        default=False,
+        help="Allow public and authenticated snapshots to have different profiles",
+    )
+    compare_pa_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing output files",
+    )
+    compare_pa_parser.set_defaults(handler=_workflow_compare_public_auth)
+
     return parser
 
 
@@ -408,6 +454,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (FetchError, SnapshotValidationError, WatchlistValidationError) as exc:
         print(str(exc), file=sys.stderr)
         return exc.exit_code
+
+
+def _workflow_compare_public_auth(args: argparse.Namespace) -> int:
+    bundle = build_compare_public_auth_bundle(
+        args.public_snapshot,
+        args.authenticated_snapshot,
+        args.out_dir,
+        watchlist_path=args.watchlist_path,
+        allow_profile_mismatch=args.allow_profile_mismatch,
+        overwrite=args.overwrite,
+    )
+    print(f"Bundle written to: {bundle.output_dir}")
+    for key, path in bundle.outputs.items():
+        print(f"  {key}: {path.name}")
+    return 0
 
 
 def _write_output_file(path: Path, content: str) -> None:
