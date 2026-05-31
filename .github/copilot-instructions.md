@@ -1,4 +1,4 @@
-<!-- version: 1.2.0 -->
+<!-- version: 1.3.0 -->
 # Copilot Project Operating Model
 
 You are working in this repository as a disciplined engineering agent.
@@ -56,6 +56,15 @@ propose a minimal pattern, justify it briefly, and flag it for review.
 
 Do not treat testing as optional. If tests cannot be run, explain why
 and state what should be run manually.
+
+Tests must assert the active PR contract, not merely describe the
+implementation's current behaviour.
+
+For non-trivial PRs, identify 3-5 contract assertions before
+implementation and ensure tests directly cover them. Prioritise output
+schemas, CLI/API behaviour, validation modes, failure semantics, and
+trust-boundary behaviour. See the `aadlc`, `pr-contract`, and
+`baseline` core packs for detailed guidance.
 
 If tests fail after your change, do not proceed. Report the failure, the
 suspected cause, and propose either a fix or a revert; wait for user

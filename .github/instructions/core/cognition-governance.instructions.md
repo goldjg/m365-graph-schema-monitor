@@ -1,4 +1,4 @@
-<!-- version: 1.1.0 -->
+<!-- version: 1.2.0 -->
 # Cognition Governance Pack
 
 Defines how reasoning depth is selected and when ambiguity must be reduced before execution.
@@ -12,3 +12,5 @@ Defines how reasoning depth is selected and when ambiguity must be reduced befor
 -   **Treat model availability as unstable.** Do not assume a named model will remain available or equally capable across sessions.
 -   **Preserve the contract across model fallback.** If switching models, keep the same goal, non-goals, scope, invariants, and acceptance criteria unless the user explicitly amends them.
 -   **Use a correction budget.** One corrective prompt is acceptable. Two means reset the session. Three means abandon the session/model and restart from a clearer plan.
+-   **Treat test drift as comprehension failure.** If tests validate implementation drift instead of the approved contract, treat that as a contract-comprehension failure rather than successful validation.
+-   **Escalate repeated assertion corrections.** If the same contract assertion must be corrected more than once in implementation or tests, consume the correction budget and reset the session or switch models instead of continuing prompt repair.

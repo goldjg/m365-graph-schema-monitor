@@ -1,4 +1,4 @@
-<!-- version: 1.0.0 -->
+<!-- version: 1.1.0 -->
 # AADLC Plan Template
 
 ## Plan metadata
@@ -35,9 +35,17 @@ Completed PR contracts are historical evidence, not binding scope. Only constrai
 
 ## Implementation phases
 
-## Test strategy
-
 ## Acceptance criteria
+
+## Contract assertions
+List 3-5 acceptance criteria that must be directly asserted in tests for
+non-trivial work. Prioritise output schemas, CLI/API contracts,
+warning/error semantics, trust-boundary behavior, persistence formats,
+security controls, and failure modes when they are in scope.
+
+## Test strategy
+Map each planned test back to the contract assertions above and note any
+exact schema, interface, or failure-semantic checks that must hold.
 
 ## Prompt ping-pong budget
 One corrective prompt is acceptable. Two corrective prompts means reset the session. Three means abandon the session/model and restart with a fresh model or clearer plan.
