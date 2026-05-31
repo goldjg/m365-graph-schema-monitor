@@ -84,6 +84,49 @@ These extra fields are ignored by `snapshots validate`, `snapshots list`, `repor
 - Sidecars are safe to inspect and commit — they contain only provenance metadata and no token data.
 - The tool never writes the token value, Authorization header, token hash, or any token-derived data to disk, logs, stdout, or stderr.
 
+## Public vs authenticated metadata comparison
+
+`version compare-sources` compares two already-fetched local XML snapshots — one public and one authenticated — without fetching anything or reading any tokens.
+
+```bash
+python -m graph_schema_monitor version compare-sources \
+  --public snapshots/2026-05-31/graph-beta-public.xml \
+  --authenticated snapshots/lab/graph-beta-auth.xml \
+  --format json
+```
+
+Arguments:
+
+| Argument | Required | Description |
+|---|---|---|
+| `--public` | yes | Path to public/unauthenticated metadata snapshot XML |
+| `--authenticated` | yes | Path to authenticated metadata snapshot XML |
+| `--format` | no | `markdown` (default) or `json` |
+| `--out` | no | Output path; stdout if omitted |
+| `--allow-profile-mismatch` | no | Allow the two snapshots to have different profiles |
+
+**Expected sidecar provenance:**
+
+- Public side: `source_kind` field may be absent (legacy public snapshots are accepted) or `"public_graph_metadata"`.
+- Authenticated side: must have `source_kind = "authenticated_graph_metadata"` and `auth_mode = "env_token"`.
+- If the authenticated sidecar is missing `source_kind` or has wrong provenance, the command exits 2.
+
+**Profile handling:**
+
+- By default, both snapshots must have the same profile (`beta` or `v1.0`). A mismatch exits 2.
+- Pass `--allow-profile-mismatch` to allow different profiles; the output will include a warning.
+
+**Interpretation of classification output:**
+
+| Classification | Meaning |
+|---|---|
+| `version_same_content_same_semantics_same` | Public and authenticated metadata matched at capture time |
+| `version_same_content_changed_*` | Same x-ms-schemaVersion but raw payload differs |
+| `version_same_content_same_semantics_changed` | Unexpected: same bytes but parsed diff found (should not occur) |
+| `version_changed_*` | x-ms-schemaVersion differs between public and authenticated |
+
+The command does not list individual schema changes — use `report diff`, `report summary`, or `watchlist check` for that.
+
 ## CLI usage
 
 ```bash
