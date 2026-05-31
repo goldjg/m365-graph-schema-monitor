@@ -14,6 +14,7 @@ validation before shaping, planning, execution, or validation decisions.
 | External API response | Remote services and web sources | Low | Cross-check critical claims before using in implementation decisions |
 | Graph metadata endpoint | `https://graph.microsoft.com/{v1.0,beta}/$metadata` | Low | Enforce HTTPS; allow fixed host/path only; apply timeout; reject redirects; require 2xx status; require XML content type |
 | Local snapshot XML | Offline CSDL input files provided via CLI | Medium | Validate path existence; parse with safe XML patterns; normalize values before diffing |
+| Local watchlist JSON | User-authored local `.json` files passed via `--watchlist` | Medium | Parse with `json.loads()`; validate explicit allowlisted fields; reject malformed structures, empty strings, duplicates, unknown change types, and unexpected fields; no eval, network, or dynamic imports |
 | CLI arguments | User-provided command flags and file/type values | Medium | Strict argparse schema, required arguments, and explicit error messages |
 
 ## Crossing rules

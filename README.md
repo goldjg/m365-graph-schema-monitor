@@ -64,6 +64,53 @@ python -m graph_schema_monitor report summary --old /tmp/graph-v1.xml --new /tmp
 
 `report summary` renders an unfiltered deterministic summary over the full local diff and supports markdown or JSON output.
 
+## Watchlists
+
+`watchlist check` evaluates an existing local diff against a local JSON watchlist and renders deterministic markdown or JSON output. Watchlist evaluation is local-only and reuses adjacent sidecar metadata when available.
+
+```bash
+python -m graph_schema_monitor watchlist check --old /tmp/graph-v1.xml --new /tmp/graph-beta.xml --watchlist tests/fixtures/watchlist_identity.json
+python -m graph_schema_monitor watchlist check --old /tmp/graph-v1.xml --new /tmp/graph-beta.xml --watchlist tests/fixtures/watchlist_identity.json --format json --out /tmp/graph-watchlist.json
+```
+
+Watchlist JSON fields:
+
+| Field | Required | Type | Notes |
+|---|---|---|---|
+| `name` | yes | string | Non-empty |
+| `description` | no | string | Optional descriptive text |
+| `type_prefixes` | yes* | list[string] | Non-empty strings; OR semantics within the list |
+| `type_names` | yes* | list[string] | Exact fully-qualified type names; OR semantics within the list |
+| `change_types` | no | list[string] | Values must be known change types |
+| `property_names` | no | list[string] | Exact property names only |
+
+\* At least one of `type_prefixes` or `type_names` must be present.
+
+Matching uses OR within each list and AND across filter classes. If `change_types` is omitted, all change types are eligible. If `property_names` is omitted, all property names are eligible. Type-level changes with `property_name = null` do not match a non-empty `property_names` filter.
+
+Example watchlist:
+
+```json
+{
+  "name": "identity-critical",
+  "description": "Schema areas relevant to Entra and Conditional Access.",
+  "type_prefixes": [
+    "microsoft.graph.conditionalAccess",
+    "microsoft.graph.identityGovernance"
+  ],
+  "change_types": [
+    "type_added",
+    "property_added",
+    "property_removed",
+    "property_type_changed",
+    "property_nullability_changed",
+    "property_collection_shape_changed"
+  ]
+}
+```
+
+`watchlist check` exits `0` on success, including when no changes match. Invalid CLI input, unreadable watchlists, malformed watchlist JSON, and invalid watchlist schema exit `2`.
+
 `snapshots list` writes the inventory table to stdout and emits warning diagnostics to stderr. Missing sidecars are warnings in list mode, while `snapshots validate` treats them as errors and exits non-zero for invalid inventory.
 
 ## Testing
@@ -79,6 +126,7 @@ python -m pytest tests/
 - `fetch` only supports the `v1.0` and `beta` public Graph `$metadata` endpoints.
 - `report diff` renders unknown metadata when an adjacent sidecar is missing, but malformed or incomplete sidecars still fail.
 - `report summary` is intentionally unfiltered in PR4.
+- `watchlist check` is intentionally local-only in PR5 and does not add scheduling, persistence, or online correlation.
 - No authentication, tenant access, OAuth, MSAL, or Graph SDK integration.
 - No arbitrary URL input, scheduler, database, web UI, changelog correlation, canary tenant logic, or AI summarization.
 

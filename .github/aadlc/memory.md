@@ -22,7 +22,8 @@ unresolved question should carry forward.
 - `src/graph_schema_monitor/fetcher.py` performs constrained snapshot acquisition from fixed Microsoft Graph metadata endpoints and writes local XML plus sidecar metadata.
 - `src/graph_schema_monitor/report.py` renders deterministic diff and summary reports over local snapshots.
 - `src/graph_schema_monitor/report_filters.py` applies deterministic report filtering and summary aggregation over `DiffChange` values.
-- `src/graph_schema_monitor/cli.py` provides `fetch`, `inspect`, `diff`, `snapshots`, and `report` commands.
+- `src/graph_schema_monitor/watchlists.py` loads and validates local watchlist JSON, matches `DiffChange` values with OR-within and AND-across semantics, and renders deterministic markdown/json watchlist reports.
+- `src/graph_schema_monitor/cli.py` provides `fetch`, `inspect`, `diff`, `snapshots`, `report`, and `watchlist` commands.
 - `tests/fixtures/` stores small hand-authored XML snapshots used for deterministic offline tests.
 
 ## Core invariants
@@ -48,6 +49,7 @@ unresolved question should carry forward.
 - `python -m graph_schema_monitor fetch --profile v1.0 --out /tmp/graph-metadata.xml --overwrite`
 - `python -m graph_schema_monitor inspect --snapshot tests/fixtures/schema_old.xml --type microsoft.graph.conditionalAccessPolicy`
 - `python -m graph_schema_monitor diff --old tests/fixtures/schema_old.xml --new tests/fixtures/schema_new.xml --type microsoft.graph.conditionalAccessPolicy`
+- `python -m graph_schema_monitor watchlist check --old tests/fixtures/schema_old.xml --new tests/fixtures/schema_new.xml --watchlist tests/fixtures/watchlist_identity.json`
 
 ## Current operating assumptions
 - Python 3.11+ is the supported runtime target.

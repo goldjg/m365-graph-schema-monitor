@@ -30,6 +30,11 @@ invariants:
     rule: Outbound network calls are limited to the allowlisted Graph metadata endpoints; no dynamic or user-supplied URLs are permitted.
     severity: critical
 
+  - id: watchlists-local-only
+    name: Watchlist evaluation is local-only
+    rule: Watchlist evaluation must use only local watchlist JSON, local snapshots, and existing diff output. It must not introduce network calls, authentication, tenant access, or external correlation.
+    severity: high
+
   - id: pr-contract-respected
     name: PR contract respected
     rule: Execution must stay inside the current PR contract unless scope is explicitly amended.
