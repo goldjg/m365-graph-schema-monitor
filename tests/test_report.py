@@ -7,7 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from graph_schema_monitor.report import JSON_DIFF_REPORT_FIELDS, build_diff_report
+from graph_schema_monitor.report import (
+    JSON_DIFF_REPORT_FIELDS,
+    SUMMARY_JSON_FIELDS,
+    build_diff_report,
+    build_summary_report,
+)
 from graph_schema_monitor.snapshots import SnapshotValidationError, sidecar_path_for_snapshot
 
 
@@ -208,5 +213,177 @@ def test_build_diff_report_fails_for_missing_required_sidecar_field(tmp_path: Pa
     payload.pop("sha256")
     sidecar_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
-    with pytest.raises(SnapshotValidationError, match="sidecar missing required field\\(s\\): sha256"):
+    with pytest.raises(SnapshotValidationError, match=r"sidecar missing required field\(s\): sha256"):
         build_diff_report(old_snapshot, new_snapshot)
+
+
+def test_build_diff_report_filters_by_change_type(tmp_path: Path) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+
+    report = build_diff_report(old_snapshot, new_snapshot, change_type="property_added")
+
+    assert "## Filters Applied" in report
+    assert "- change-type: property_added" in report
+    assert "microsoft.graph.conditionalAccessPolicy.templateId" in report
+    assert "microsoft.graph.conditionalAccessConditionSet.clientApplications" in report
+
+
+def test_build_diff_report_filters_by_type_prefix(tmp_path: Path) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+
+    report = build_diff_report(
+        old_snapshot,
+        new_snapshot,
+        type_prefix="microsoft.graph.conditionalAccessPolicy",
+    )
+
+    assert "## Filters Applied" in report
+    assert "- type-prefix: microsoft.graph.conditionalAccessPolicy" in report
+    assert "microsoft.graph.conditionalAccessPolicy.templateId" in report
+    assert "microsoft.graph.conditionalAccessConditionSet.clientApplications" not in report
+
+
+def test_build_diff_report_limit(tmp_path: Path) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+
+    payload = json.loads(build_diff_report(old_snapshot, new_snapshot, output_format="json", limit=1))
+
+    assert payload["total_changes"] == 1
+    assert len(payload["changes"]) == 1
+
+
+def test_build_diff_report_no_filter_section_when_no_filters(tmp_path: Path) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+
+    report = build_diff_report(old_snapshot, new_snapshot)
+
+    assert "## Filters Applied" not in report
+
+
+def test_build_summary_report_markdown(tmp_path: Path) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+
+    report = build_summary_report(old_snapshot, new_snapshot)
+
+    assert report.startswith("# Graph Schema Summary Report")
+    assert "## Summary" in report
+    assert "### Changes by Type" in report
+    assert "### Top Affected Type Prefixes" in report
+
+
+def test_build_summary_report_json(tmp_path: Path) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+
+    payload = json.loads(build_summary_report(old_snapshot, new_snapshot, output_format="json"))
+
+    assert list(payload) == list(SUMMARY_JSON_FIELDS)
+    assert tuple(payload["by_change_type"]) == (
+        "type_added",
+        "type_removed",
+        "property_added",
+        "property_removed",
+        "property_type_changed",
+        "property_nullability_changed",
+        "property_collection_shape_changed",
+    )
+    assert isinstance(payload["top_type_prefixes"], list)
+
+
+def test_build_summary_report_is_deterministic(tmp_path: Path) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+
+    first = build_summary_report(old_snapshot, new_snapshot, output_format="json")
+    second = build_summary_report(old_snapshot, new_snapshot, output_format="json")
+
+    assert first == second

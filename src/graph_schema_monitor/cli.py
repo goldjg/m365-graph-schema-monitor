@@ -11,7 +11,7 @@ from typing import Sequence
 from .diff import changes_to_json, diff_snapshots, render_changes_text
 from .fetcher import FetchError, fetch_snapshot
 from .parser import parse_csdl_file
-from .report import build_diff_report
+from .report import build_diff_report, build_summary_report
 from .snapshots import (
     SnapshotValidationError,
     has_snapshot_errors,
@@ -76,8 +76,45 @@ def _build_parser() -> argparse.ArgumentParser:
         default="markdown",
         help="Report output format",
     )
+    report_diff_parser.add_argument(
+        "--change-type",
+        dest="change_type",
+        default=None,
+        help="Filter to a single change type (e.g. property_added)",
+    )
+    report_diff_parser.add_argument(
+        "--type-prefix",
+        dest="type_prefix",
+        default=None,
+        help="Filter to type names starting with this prefix",
+    )
+    report_diff_parser.add_argument(
+        "--type-name",
+        dest="type_name_filter",
+        default=None,
+        help="Filter to an exact type name",
+    )
+    report_diff_parser.add_argument(
+        "--limit",
+        dest="limit",
+        type=int,
+        default=None,
+        help="Limit output to the first N changes after filtering",
+    )
     report_diff_parser.add_argument("--out", dest="output_path", help="Optional output path for the rendered report")
     report_diff_parser.set_defaults(handler=_report_diff)
+
+    report_summary_parser = report_subparsers.add_parser("summary", help="Render a summary report from local snapshots")
+    report_summary_parser.add_argument("--old", required=True, dest="old_snapshot")
+    report_summary_parser.add_argument("--new", required=True, dest="new_snapshot")
+    report_summary_parser.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["markdown", "json"],
+        default="markdown",
+    )
+    report_summary_parser.add_argument("--out", dest="output_path")
+    report_summary_parser.set_defaults(handler=_report_summary)
 
     return parser
 
@@ -142,7 +179,32 @@ def _snapshots_validate(args: argparse.Namespace) -> int:
 
 
 def _report_diff(args: argparse.Namespace) -> int:
-    report = build_diff_report(args.old_snapshot, args.new_snapshot, output_format=args.output_format)
+    try:
+        report = build_diff_report(
+            args.old_snapshot,
+            args.new_snapshot,
+            output_format=args.output_format,
+            change_type=args.change_type,
+            type_prefix=args.type_prefix,
+            type_name=getattr(args, "type_name_filter", None),
+            limit=args.limit,
+        )
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if args.output_path:
+        _write_output_file(Path(args.output_path), report + "\n")
+        return 0
+    print(report)
+    return 0
+
+
+def _report_summary(args: argparse.Namespace) -> int:
+    report = build_summary_report(
+        args.old_snapshot,
+        args.new_snapshot,
+        output_format=args.output_format,
+    )
     if args.output_path:
         _write_output_file(Path(args.output_path), report + "\n")
         return 0

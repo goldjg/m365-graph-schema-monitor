@@ -69,7 +69,7 @@ def test_cli_inspect_outputs_expected_type() -> None:
 
     assert result.returncode == 0
     assert "Type: microsoft.graph.conditionalAccessPolicy (EntityType)" in result.stdout
-    assert "displayName\ttype=Edm.String\tnullable=true\tcollection=false" in result.stdout
+    assert "displayName	type=Edm.String	nullable=true	collection=false" in result.stdout
 
 
 def test_cli_diff_json_outputs_template_id_addition() -> None:
@@ -104,8 +104,8 @@ def test_cli_snapshots_list_outputs_inventory(tmp_path: Path, capsys: pytest.Cap
 
     captured = capsys.readouterr()
     assert exit_code == 0
-    assert "SNAPSHOT\tSTATUS\tTYPES\tPROFILE\tFETCHED_AT_UTC\tSHA256" in captured.out
-    assert "snapshot.xml\tok\t2\tv1.0\t2026-05-30T20:00:00Z" in captured.out
+    assert "SNAPSHOT	STATUS	TYPES	PROFILE	FETCHED_AT_UTC	SHA256" in captured.out
+    assert "snapshot.xml	ok	2	v1.0	2026-05-30T20:00:00Z" in captured.out
 
 
 def test_cli_snapshots_list_sends_missing_sidecar_warning_to_stderr(
@@ -118,8 +118,8 @@ def test_cli_snapshots_list_sends_missing_sidecar_warning_to_stderr(
 
     captured = capsys.readouterr()
     assert exit_code == 0
-    assert "snapshot.xml\twarning\t2\t\t\t" in captured.out
-    assert f"WARNING\tsnapshot.xml\tmissing sidecar: {tmp_path / 'snapshot.xml.json'}" in captured.err
+    assert "snapshot.xml	warning	2			" in captured.out
+    assert f"WARNING	snapshot.xml	missing sidecar: {tmp_path / 'snapshot.xml.json'}" in captured.err
 
 
 def test_cli_snapshots_validate_returns_nonzero_for_invalid_snapshot(
@@ -132,7 +132,7 @@ def test_cli_snapshots_validate_returns_nonzero_for_invalid_snapshot(
 
     captured = capsys.readouterr()
     assert exit_code == 1
-    assert "ERROR\tsnapshot.xml\tmissing sidecar:" in captured.out
+    assert "ERROR	snapshot.xml	missing sidecar:" in captured.out
 
 
 def test_cli_report_diff_writes_to_stdout(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -211,3 +211,164 @@ def test_cli_report_diff_writes_to_file(tmp_path: Path) -> None:
     assert exit_code == 0
     assert output_path.exists()
     assert "# Graph Schema Diff Report" in output_path.read_text(encoding="utf-8")
+
+
+def test_cli_report_diff_change_type_filter(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+
+    exit_code = cli.main(
+        [
+            "report",
+            "diff",
+            "--old",
+            str(old_snapshot),
+            "--new",
+            str(new_snapshot),
+            "--change-type",
+            "property_added",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "property_added" in captured.out
+    assert "microsoft.graph.conditionalAccessPolicy.templateId" in captured.out
+
+
+def test_cli_report_diff_invalid_change_type_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+
+    exit_code = cli.main(
+        ["report", "diff", "--old", str(old_snapshot), "--new", str(new_snapshot), "--change-type", "bad"]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "Unrecognized change type" in captured.err
+
+
+def test_cli_report_diff_limit(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+
+    exit_code = cli.main(
+        ["report", "diff", "--old", str(old_snapshot), "--new", str(new_snapshot), "--format", "json", "--limit", "1"]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    payload = json.loads(captured.out)
+    assert len(payload["changes"]) == 1
+
+
+def test_cli_report_summary_markdown(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+
+    exit_code = cli.main(["report", "summary", "--old", str(old_snapshot), "--new", str(new_snapshot)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert captured.out.startswith("# Graph Schema Summary Report")
+
+
+def test_cli_report_summary_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+
+    exit_code = cli.main(
+        ["report", "summary", "--old", str(old_snapshot), "--new", str(new_snapshot), "--format", "json"]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    payload = json.loads(captured.out)
+    assert "total_changes" in payload
+
+
+def test_cli_report_summary_out_file(tmp_path: Path) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+    output_path = tmp_path / "summary.md"
+
+    exit_code = cli.main(
+        ["report", "summary", "--old", str(old_snapshot), "--new", str(new_snapshot), "--out", str(output_path)]
+    )
+
+    assert exit_code == 0
+    assert output_path.exists()
+    assert output_path.read_text(encoding="utf-8").startswith("# Graph Schema Summary Report")
