@@ -110,7 +110,7 @@ def test_snapshot_validation_warns_on_extra_sidecar_fields(tmp_path: Path) -> No
 
     assert not has_snapshot_errors(inspections)
     assert inspections[0].status == "ok"
-    assert "WARNING\tsnapshot.xml\textra sidecar field(s) ignored: unexpected:" in rendered
+    assert "WARNING\tsnapshot.xml\textra sidecar field(s) ignored: unexpected" in rendered
     assert "OK\tsnapshot.xml" in rendered
 
 

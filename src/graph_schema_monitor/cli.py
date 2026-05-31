@@ -160,6 +160,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _write_output_file(path: Path, content: str) -> None:
     temp_path: str | None = None
     try:
+        if not path.parent.exists() or not path.parent.is_dir():
+            raise SnapshotValidationError(f"Output directory does not exist: {path.parent}")
         existing_mode = path.stat().st_mode if path.exists() else None
         fd, temp_path = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
         with os.fdopen(fd, "w", encoding="utf-8") as handle:

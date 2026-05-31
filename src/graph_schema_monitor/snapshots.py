@@ -219,10 +219,10 @@ def _load_snapshot_sidecar_result(
         missing = ", ".join(missing_fields)
         raise SnapshotValidationError(f"sidecar missing required field(s): {missing}: {resolved_sidecar_path}")
 
-    extra_fields = sorted(field for field in payload if field not in ALLOWED_SIDECAR_FIELDS)
+    unexpected_fields = sorted(field for field in payload if field not in ALLOWED_SIDECAR_FIELDS)
     warnings: list[str] = []
-    if extra_fields:
-        extras = ", ".join(extra_fields)
+    if unexpected_fields:
+        extras = ", ".join(unexpected_fields)
         warnings.append(f"extra sidecar field(s) ignored: {extras}")
 
     profile = _require_str(payload, "profile", resolved_sidecar_path)
