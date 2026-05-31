@@ -1,6 +1,6 @@
 # m365-graph-schema-monitor
 
-`m365-graph-schema-monitor` is an offline-first tool for acquiring Microsoft Graph metadata snapshots, inspecting CSDL types, and diffing schema changes.
+`m365-graph-schema-monitor` is an offline-first tool for acquiring Microsoft Graph metadata snapshots, inspecting CSDL types, diffing schema changes, and rendering deterministic local reports over fetched snapshots.
 
 ## Why this exists
 
@@ -16,13 +16,16 @@ python -m pip install -e ".[dev]"
 
 ## Workflow
 
-Fetch a local snapshot, inspect one type, then diff two snapshots:
+Fetch local snapshots, inspect one type, diff snapshots, inventory a snapshot directory, then render a report:
 
 ```bash
 python -m graph_schema_monitor fetch --profile v1.0 --out /tmp/graph-v1.xml --overwrite
 python -m graph_schema_monitor fetch --profile beta --out /tmp/graph-beta.xml --overwrite
 python -m graph_schema_monitor inspect --snapshot /tmp/graph-v1.xml --type microsoft.graph.conditionalAccessPolicy
 python -m graph_schema_monitor diff --old /tmp/graph-v1.xml --new /tmp/graph-beta.xml --type microsoft.graph.conditionalAccessPolicy
+python -m graph_schema_monitor snapshots list --dir /tmp
+python -m graph_schema_monitor snapshots validate --dir /tmp
+python -m graph_schema_monitor report diff --old /tmp/graph-v1.xml --new /tmp/graph-beta.xml --out /tmp/graph-report.md
 ```
 
 ## Network boundary
@@ -45,7 +48,12 @@ python -m graph_schema_monitor fetch --profile v1.0 --out /tmp/graph-v1.xml --ov
 python -m graph_schema_monitor inspect --snapshot tests/fixtures/schema_old.xml --type microsoft.graph.conditionalAccessPolicy
 python -m graph_schema_monitor diff --old tests/fixtures/schema_old.xml --new tests/fixtures/schema_new.xml --type microsoft.graph.conditionalAccessPolicy
 python -m graph_schema_monitor diff --old tests/fixtures/schema_old.xml --new tests/fixtures/schema_new.xml --format json
+python -m graph_schema_monitor snapshots list --dir /tmp
+python -m graph_schema_monitor snapshots validate --dir /tmp
+python -m graph_schema_monitor report diff --old /tmp/graph-v1.xml --new /tmp/graph-beta.xml
 ```
+
+`report diff` automatically resolves sidecars as `<snapshot-path>.json` and defaults to markdown output. Use `--out` to write the rendered report to a file; otherwise it prints to stdout.
 
 ## Testing
 
@@ -58,6 +66,7 @@ python -m pytest tests/
 - Parser scope is intentionally limited to `EntityType` and `ComplexType` declared properties.
 - Diff identity is `fully-qualified-type-name + property-name` (declared-only, no inheritance flattening).
 - `fetch` only supports the `v1.0` and `beta` public Graph `$metadata` endpoints.
+- `report diff` requires locally resolved sidecars for both input snapshots.
 - No authentication, tenant access, OAuth, MSAL, or Graph SDK integration.
 - No arbitrary URL input, scheduler, database, web UI, changelog correlation, canary tenant logic, or AI summarization.
 
