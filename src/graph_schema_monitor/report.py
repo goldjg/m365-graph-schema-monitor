@@ -18,6 +18,20 @@ CHANGE_GROUPS = (
     ("property_collection_shape_changed", "Property Collection Shape Changed"),
 )
 
+JSON_DIFF_REPORT_FIELDS = (
+    "report_type",
+    "old_snapshot",
+    "new_snapshot",
+    "old_profile",
+    "new_profile",
+    "old_fetched_at_utc",
+    "new_fetched_at_utc",
+    "old_sha256",
+    "new_sha256",
+    "total_changes",
+    "changes",
+)
+
 
 def build_diff_report(
     old_snapshot_path: str | Path,
@@ -95,7 +109,8 @@ def render_json_diff_report(
         "total_changes": len(changes),
         "changes": changes_to_json(changes),
     }
-    return json.dumps(payload, indent=2)
+    approved_payload = {field: payload[field] for field in JSON_DIFF_REPORT_FIELDS}
+    return json.dumps(approved_payload, indent=2)
 
 
 def _format_value(value: Any) -> str:

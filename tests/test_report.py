@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from graph_schema_monitor.report import build_diff_report
+from graph_schema_monitor.report import JSON_DIFF_REPORT_FIELDS, build_diff_report
 from graph_schema_monitor.snapshots import SnapshotValidationError, sidecar_path_for_snapshot
 
 
@@ -95,6 +95,8 @@ def test_build_diff_report_supports_deterministic_json_output(tmp_path: Path) ->
 
     assert first == second
     payload = json.loads(first)
+    assert list(payload) == list(JSON_DIFF_REPORT_FIELDS)
+    assert "metadata" not in payload
     assert payload == {
         "report_type": "schema_diff",
         "old_snapshot": str(old_snapshot),
@@ -133,6 +135,8 @@ def test_build_diff_report_json_uses_null_metadata_for_missing_sidecar(tmp_path:
 
     payload = json.loads(build_diff_report(old_snapshot, new_snapshot, output_format="json"))
 
+    assert list(payload) == list(JSON_DIFF_REPORT_FIELDS)
+    assert "metadata" not in payload
     assert payload["old_snapshot"] == str(old_snapshot)
     assert payload["old_profile"] is None
     assert payload["old_fetched_at_utc"] is None
