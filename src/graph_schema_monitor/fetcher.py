@@ -29,6 +29,7 @@ ALLOWED_SIDECAR_FIELDS = (
     "sha256",
     "x_ms_schema_version",
 )
+_AUTHENTICATED_EXTRA_SIDECAR_FIELDS = ("source_kind", "auth_mode", "tenant_label")
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,24 @@ class FetchResult:
     sidecar_path: Path
 
 
+@dataclass(frozen=True)
+class AuthFetchResult:
+    profile: str
+    source_url: str
+    fetched_at_utc: str
+    status_code: int
+    content_type: str | None
+    etag: str | None
+    last_modified: str | None
+    sha256: str
+    x_ms_schema_version: str | None
+    source_kind: str
+    auth_mode: str
+    tenant_label: str | None
+    output_path: Path
+    sidecar_path: Path
+
+
 class FetchError(Exception):
     exit_code = 1
 
@@ -55,6 +74,10 @@ class InvalidProfileError(FetchError):
 
 
 class OutputConflictError(FetchError):
+    exit_code = 2
+
+
+class TokenError(FetchError):
     exit_code = 2
 
 
@@ -179,6 +202,98 @@ def fetch_snapshot(
     )
 
 
+def fetch_authenticated_snapshot(
+    profile: str,
+    out_path: str | Path,
+    *,
+    token_env: str,
+    tenant_label: str | None = None,
+    overwrite: bool = False,
+    timeout: int = DEFAULT_TIMEOUT_SECONDS,
+    opener: request.OpenerDirector | None = None,
+) -> AuthFetchResult:
+    source_url = resolve_profile_url(profile)
+    output_path = Path(out_path)
+    sidecar_path = Path(f"{output_path}.json")
+    _validate_output_paths(output_path, sidecar_path, overwrite=overwrite)
+
+    if not token_env:
+        raise TokenError("Token environment variable is required: --token-env")
+    raw_token = os.environ.get(token_env)
+    if raw_token is None:
+        raise TokenError(f"Token environment variable is not set: {token_env}")
+    token = raw_token.strip()
+    if not token:
+        raise TokenError(f"Token environment variable is empty: {token_env}")
+
+    req = request.Request(source_url, headers={"Authorization": f"Bearer {token}"})
+    active_opener = opener or build_url_opener()
+    try:
+        with active_opener.open(req, timeout=timeout) as response:
+            status_code = response.getcode()
+            if status_code is None or not 200 <= status_code < 300:
+                raise HttpStatusError(f"Authenticated metadata fetch failed with HTTP {status_code}")
+
+            content_type = response.headers.get("Content-Type")
+            if not _is_xml_content_type(content_type):
+                raise UnexpectedContentTypeError(
+                    f"Unexpected content type: {content_type or 'missing Content-Type header'}."
+                )
+
+            content = response.read()
+            fetched_at_utc = _utc_now_iso8601()
+            sha256 = hashlib.sha256(content).hexdigest()
+            etag = response.headers.get("ETag")
+            last_modified = response.headers.get("Last-Modified")
+            x_ms_schema_version = response.headers.get("x-ms-schemaVersion")
+    except error.HTTPError as exc:
+        raise HttpStatusError(f"Authenticated metadata fetch failed with HTTP {exc.code}") from exc
+    except RedirectNotAllowedError:
+        raise
+    except error.URLError as exc:
+        reason = exc.reason
+        if isinstance(reason, (TimeoutError, socket.timeout)):
+            raise NetworkFailureError(f"Network timeout after {timeout} seconds.") from exc
+        raise NetworkFailureError(f"Network error: {reason}.") from exc
+    except socket.timeout as exc:
+        raise NetworkFailureError(f"Network timeout after {timeout} seconds.") from exc
+
+    sidecar_payload = {
+        "profile": profile,
+        "source_url": source_url,
+        "fetched_at_utc": fetched_at_utc,
+        "status_code": status_code,
+        "content_type": content_type,
+        "etag": etag,
+        "last_modified": last_modified,
+        "sha256": sha256,
+        "x_ms_schema_version": x_ms_schema_version,
+        "source_kind": "authenticated_graph_metadata",
+        "auth_mode": "env_token",
+        "tenant_label": tenant_label,
+    }
+    _write_file(output_path, content)
+    _write_file(sidecar_path, _render_authenticated_sidecar_json(sidecar_payload).encode("utf-8"))
+
+    return AuthFetchResult(
+        profile=profile,
+        source_url=source_url,
+        fetched_at_utc=fetched_at_utc,
+        status_code=status_code,
+        content_type=content_type,
+        etag=etag,
+        last_modified=last_modified,
+        sha256=sha256,
+        x_ms_schema_version=x_ms_schema_version,
+        source_kind="authenticated_graph_metadata",
+        auth_mode="env_token",
+        tenant_label=tenant_label,
+        output_path=output_path,
+        sidecar_path=sidecar_path,
+    )
+
+
+
 def _validate_allowlisted_url(url: str) -> None:
     parsed = parse.urlparse(url)
     if parsed.scheme != "https":
@@ -212,6 +327,13 @@ def _utc_now_iso8601() -> str:
 
 def _render_sidecar_json(payload: dict[str, Any]) -> str:
     ordered_payload = {field: payload[field] for field in ALLOWED_SIDECAR_FIELDS}
+    return json.dumps(ordered_payload, indent=2)
+
+
+def _render_authenticated_sidecar_json(payload: dict[str, Any]) -> str:
+    ordered_payload = {field: payload[field] for field in ALLOWED_SIDECAR_FIELDS}
+    for field in _AUTHENTICATED_EXTRA_SIDECAR_FIELDS:
+        ordered_payload[field] = payload[field]
     return json.dumps(ordered_payload, indent=2)
 
 
