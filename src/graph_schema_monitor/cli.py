@@ -20,6 +20,11 @@ from .snapshots import (
     render_snapshot_validation,
     render_snapshot_warnings,
 )
+from .source_compare import (
+    build_source_comparison,
+    render_source_comparison_json,
+    render_source_comparison_markdown,
+)
 from .versioning import (
     build_version_comparison,
     render_version_comparison_json,
@@ -183,6 +188,43 @@ def _build_parser() -> argparse.ArgumentParser:
     version_compare_parser.add_argument("--out", dest="output_path", help="Optional output path for the report")
     version_compare_parser.set_defaults(handler=_version_compare)
 
+    version_compare_sources_parser = version_subparsers.add_parser(
+        "compare-sources",
+        help="Compare a public and an authenticated local snapshot",
+    )
+    version_compare_sources_parser.add_argument(
+        "--public",
+        required=True,
+        dest="public_snapshot",
+        help="Path to public/unauthenticated metadata snapshot XML",
+    )
+    version_compare_sources_parser.add_argument(
+        "--authenticated",
+        required=True,
+        dest="authenticated_snapshot",
+        help="Path to authenticated metadata snapshot XML",
+    )
+    version_compare_sources_parser.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["markdown", "json"],
+        default="markdown",
+        help="Output format",
+    )
+    version_compare_sources_parser.add_argument(
+        "--out",
+        dest="output_path",
+        help="Optional output path for the report",
+    )
+    version_compare_sources_parser.add_argument(
+        "--allow-profile-mismatch",
+        dest="allow_profile_mismatch",
+        action="store_true",
+        default=False,
+        help="Allow public and authenticated snapshots to have different profiles",
+    )
+    version_compare_sources_parser.set_defaults(handler=_version_compare_sources)
+
     return parser
 
 
@@ -333,6 +375,23 @@ def _version_compare(args: argparse.Namespace) -> int:
         result = render_version_comparison_json(comparison)
     else:
         result = render_version_comparison_markdown(comparison)
+    if args.output_path:
+        _write_output_file(Path(args.output_path), result + "\n")
+        return 0
+    print(result)
+    return 0
+
+
+def _version_compare_sources(args: argparse.Namespace) -> int:
+    comparison = build_source_comparison(
+        args.public_snapshot,
+        args.authenticated_snapshot,
+        allow_profile_mismatch=args.allow_profile_mismatch,
+    )
+    if args.output_format == "json":
+        result = render_source_comparison_json(comparison)
+    else:
+        result = render_source_comparison_markdown(comparison)
     if args.output_path:
         _write_output_file(Path(args.output_path), result + "\n")
         return 0

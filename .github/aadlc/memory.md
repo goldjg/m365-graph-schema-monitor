@@ -24,6 +24,7 @@ unresolved question should carry forward.
 - `src/graph_schema_monitor/report_filters.py` applies deterministic report filtering and summary aggregation over `DiffChange` values.
 - `src/graph_schema_monitor/watchlists.py` loads and validates local watchlist JSON, matches `DiffChange` values with OR-within and AND-across semantics, and renders deterministic markdown/json watchlist reports.
 - `src/graph_schema_monitor/versioning.py` performs local-only version/hash/semantic comparison over validated snapshot bundles; it uses `load_snapshot_bundle()`, `diff_snapshots()`, and `SnapshotValidationError` without modifying them. `VersionComparison` dataclass fields: `old_snapshot`, `new_snapshot` (Path); `old_profile`, `new_profile`, `old_fetched_at_utc`, `new_fetched_at_utc` (str|None); `old_sha256`, `new_sha256`, `old_x_ms_schema_version`, `new_x_ms_schema_version` (str, validated non-empty); `schema_version_changed`, `sha256_changed`, `semantic_changes_present` (bool); `semantic_change_count` (int); `classification` (str).
+- `src/graph_schema_monitor/source_compare.py` composes `load_snapshot_bundle()`, raw sidecar JSON reads, and `build_version_comparison()` to produce a `SourceComparison` for public-vs-authenticated local snapshot comparison; no network, no env var, no token access.
 - `src/graph_schema_monitor/cli.py` provides `fetch`, `fetch-auth`, `inspect`, `diff`, `snapshots`, `report`, `watchlist`, and `version` commands.
 - `tests/fixtures/` stores small hand-authored XML snapshots used for deterministic offline tests.
 
@@ -37,6 +38,9 @@ unresolved question should carry forward.
 - watchlists-local-only: see invariants.yml.
 - version-comparison-local-only: see invariants.yml.
 - auth-token-not-persisted: see invariants.yml.
+
+- Authenticated sidecar extra fields (`source_kind`, `auth_mode`, `tenant_label`) are not in `ALLOWED_SIDECAR_FIELDS` and are silently ignored (warning only) by `load_snapshot_bundle()`; `source_compare.py` reads them separately via `json.loads()` after bundle validation.
+- `source-comparison-local-only`: see invariants.yml.
 
 ## Trust boundaries
 - User input boundary: CLI paths and type names are untrusted and must be validated for existence/shape.
@@ -68,4 +72,4 @@ unresolved question should carry forward.
 - Should a future live integration test be added behind `GRAPH_SCHEMA_MONITOR_LIVE_TESTS=1` while remaining skipped by default in CI?
 
 ## Last updated
-2026-05-31 by Copilot (PR7)
+2026-05-31 by Copilot (PR8)
