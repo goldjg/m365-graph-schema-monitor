@@ -8,6 +8,7 @@ import socket
 import subprocess
 import sys
 from pathlib import Path
+from typing import NoReturn
 from unittest.mock import patch
 
 import pytest
@@ -589,7 +590,7 @@ def test_version_compare_no_network(tmp_path: Path) -> None:
 
     original_socket = socket.socket
 
-    def _no_network(*args: object, **kwargs: object) -> None:  # type: ignore[return]
+    def _no_network(*args: object, **kwargs: object) -> NoReturn:
         raise AssertionError("build_version_comparison() must not open network sockets")
 
     with patch("socket.socket", side_effect=_no_network):
