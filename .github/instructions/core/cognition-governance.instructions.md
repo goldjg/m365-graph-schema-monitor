@@ -1,4 +1,4 @@
-<!-- version: 1.0.0 -->
+<!-- version: 1.1.0 -->
 # Cognition Governance Pack
 
 Defines how reasoning depth is selected and when ambiguity must be reduced before execution.
@@ -9,3 +9,6 @@ Defines how reasoning depth is selected and when ambiguity must be reduced befor
 -   **Reduce ambiguity before costly execution.** If scope, constraints, or trust-boundary effects are unclear, pause and clarify before executing.
 -   **Avoid assumption-driven execution.** Do not convert unresolved ambiguity into implicit assumptions that drive code or configuration changes.
 -   **Escalate when risk dominates.** If wrong assumptions could violate invariants or create high rework cost, escalate to explicit user clarification.
+-   **Treat model availability as unstable.** Do not assume a named model will remain available or equally capable across sessions.
+-   **Preserve the contract across model fallback.** If switching models, keep the same goal, non-goals, scope, invariants, and acceptance criteria unless the user explicitly amends them.
+-   **Use a correction budget.** One corrective prompt is acceptable. Two means reset the session. Three means abandon the session/model and restart from a clearer plan.

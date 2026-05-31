@@ -1,4 +1,4 @@
-<!-- version: 1.0.0 -->
+<!-- version: 1.1.0 -->
 # PR Contract Pack
 
 Defines the PR contract controls that constrain implementation scope and govern escalation.
@@ -9,3 +9,8 @@ Defines the PR contract controls that constrain implementation scope and govern 
 -   **Honor architectural and security constraints.** Contract constraints are mandatory guardrails during implementation and validation.
 -   **Validate against expected file and test surfaces.** Keep changes aligned to expected files and listed validation commands.
 -   **Use escalation triggers and reset notes.** Escalate when trigger conditions are met and document context reset expectations on completion.
+-   **Avoid stale contract anchoring.** Do not treat a completed PR constraint as durable law unless it has been promoted to an invariant.
+-   **Carry forward only promoted invariants.** Completed PR contracts are historical evidence, not binding scope, unless the current contract explicitly promotes a constraint.
+-   **Contract amendments must be explicit.** If a PR intentionally changes a previous constraint or introduces a new trust boundary, record the amendment in the current PR contract or plan file before implementation.
+-   **Do not over-anchor on prior contracts.** New PRs may intentionally amend prior constraints when the amendment is explicit and scoped in the current contract.
+-   **Approve new trust boundaries explicitly.** Treat a newly introduced trust boundary as approved only when the current PR contract or plan file records it as an intentional amendment.
