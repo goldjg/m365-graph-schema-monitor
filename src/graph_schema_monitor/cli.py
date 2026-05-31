@@ -20,6 +20,13 @@ from .snapshots import (
     render_snapshot_validation,
     render_snapshot_warnings,
 )
+from .watchlists import (
+    WatchlistValidationError,
+    load_watchlist,
+    match_watchlist,
+    render_watchlist_json_report,
+    render_watchlist_markdown_report,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -115,6 +122,25 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     report_summary_parser.add_argument("--out", dest="output_path")
     report_summary_parser.set_defaults(handler=_report_summary)
+
+    watchlist_parser = subparsers.add_parser("watchlist", help="Evaluate local watchlists against local snapshots")
+    watchlist_subparsers = watchlist_parser.add_subparsers(dest="watchlist_command", required=True)
+
+    watchlist_check_parser = watchlist_subparsers.add_parser("check", help="Check a watchlist against a local diff")
+    watchlist_check_parser.add_argument("--old", required=True, dest="old_snapshot", help="Path to old snapshot")
+    watchlist_check_parser.add_argument("--new", required=True, dest="new_snapshot", help="Path to new snapshot")
+    watchlist_check_parser.add_argument(
+        "--watchlist", required=True, dest="watchlist_path", help="Path to local watchlist JSON"
+    )
+    watchlist_check_parser.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["markdown", "json"],
+        default="markdown",
+        help="Watchlist report output format",
+    )
+    watchlist_check_parser.add_argument("--out", dest="output_path", help="Optional output path for the rendered report")
+    watchlist_check_parser.set_defaults(handler=_watchlist_check)
 
     return parser
 
@@ -212,13 +238,48 @@ def _report_summary(args: argparse.Namespace) -> int:
     return 0
 
 
+def _watchlist_check(args: argparse.Namespace) -> int:
+    from .snapshots import load_snapshot_bundle
+
+    old_bundle = load_snapshot_bundle(args.old_snapshot, allow_missing_sidecar=True)
+    new_bundle = load_snapshot_bundle(args.new_snapshot, allow_missing_sidecar=True)
+    changes = diff_snapshots(old_bundle.snapshot, new_bundle.snapshot)
+    watchlist = load_watchlist(args.watchlist_path)
+    matching_changes = match_watchlist(changes, watchlist)
+
+    if args.output_format == "json":
+        report = render_watchlist_json_report(
+            old_bundle,
+            new_bundle,
+            watchlist,
+            args.watchlist_path,
+            changes,
+            matching_changes,
+        )
+    else:
+        report = render_watchlist_markdown_report(
+            old_bundle,
+            new_bundle,
+            watchlist,
+            args.watchlist_path,
+            changes,
+            matching_changes,
+        )
+
+    if args.output_path:
+        _write_output_file(Path(args.output_path), report + "\n")
+        return 0
+    print(report)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
     try:
         return args.handler(args)
-    except (FetchError, SnapshotValidationError) as exc:
+    except (FetchError, SnapshotValidationError, WatchlistValidationError) as exc:
         print(str(exc), file=sys.stderr)
         return exc.exit_code
 

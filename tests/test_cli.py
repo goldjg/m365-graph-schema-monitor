@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -56,6 +57,12 @@ def _write_snapshot_with_sidecar(
     }
     sidecar_path_for_snapshot(snapshot_path).write_text(json.dumps(sidecar_payload, indent=2), encoding="utf-8")
     return snapshot_path
+
+
+def _write_watchlist(tmp_path: Path, payload: object, *, name: str = "watchlist.json") -> Path:
+    watchlist_path = tmp_path / name
+    watchlist_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return watchlist_path
 
 
 def test_cli_inspect_outputs_expected_type() -> None:
@@ -372,3 +379,263 @@ def test_cli_report_summary_out_file(tmp_path: Path) -> None:
     assert exit_code == 0
     assert output_path.exists()
     assert output_path.read_text(encoding="utf-8").startswith("# Graph Schema Summary Report")
+
+
+def test_cli_watchlist_check_markdown_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+    watchlist = _write_watchlist(
+        tmp_path,
+        {
+            "name": "identity",
+            "type_prefixes": ["microsoft.graph.conditionalAccess"],
+            "change_types": ["property_added"],
+        },
+    )
+
+    exit_code = cli.main(
+        ["watchlist", "check", "--old", str(old_snapshot), "--new", str(new_snapshot), "--watchlist", str(watchlist)]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "# Graph Schema Watchlist Report" in captured.out
+    assert "microsoft.graph.conditionalAccessPolicy.templateId" in captured.out
+
+
+def test_cli_watchlist_check_json_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+    watchlist = _write_watchlist(
+        tmp_path,
+        {
+            "name": "identity",
+            "type_prefixes": ["microsoft.graph.conditionalAccess"],
+            "change_types": ["property_added"],
+        },
+    )
+
+    exit_code = cli.main(
+        [
+            "watchlist",
+            "check",
+            "--old",
+            str(old_snapshot),
+            "--new",
+            str(new_snapshot),
+            "--watchlist",
+            str(watchlist),
+            "--format",
+            "json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    payload = json.loads(captured.out)
+    assert payload["report_type"] == "schema_watchlist"
+    assert payload["watchlist_name"] == "identity"
+    assert payload["matching_changes"] >= 1
+
+
+def test_cli_watchlist_check_out_file(tmp_path: Path) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+    watchlist = _write_watchlist(
+        tmp_path,
+        {
+            "name": "identity",
+            "type_prefixes": ["microsoft.graph.conditionalAccess"],
+            "change_types": ["property_added"],
+        },
+    )
+    output_path = tmp_path / "watchlist.md"
+
+    exit_code = cli.main(
+        [
+            "watchlist",
+            "check",
+            "--old",
+            str(old_snapshot),
+            "--new",
+            str(new_snapshot),
+            "--watchlist",
+            str(watchlist),
+            "--out",
+            str(output_path),
+        ]
+    )
+
+    assert exit_code == 0
+    assert output_path.exists()
+    assert output_path.read_text(encoding="utf-8").startswith("# Graph Schema Watchlist Report")
+
+
+def test_cli_watchlist_check_invalid_watchlist_exits_nonzero(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+    watchlist = _write_watchlist(tmp_path, {"type_prefixes": ["microsoft.graph.conditionalAccess"]})
+
+    exit_code = cli.main(
+        ["watchlist", "check", "--old", str(old_snapshot), "--new", str(new_snapshot), "--watchlist", str(watchlist)]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "watchlist name must be a non-empty string" in captured.err
+
+
+def test_cli_watchlist_check_surfaces_load_watchlist_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+    watchlist = _write_watchlist(
+        tmp_path,
+        {"name": "identity", "type_prefixes": ["microsoft.graph.conditionalAccess"]},
+    )
+
+    def _raise_watchlist_error(_path: str) -> object:
+        raise cli.WatchlistValidationError("sentinel watchlist failure")
+
+    monkeypatch.setattr(cli, "load_watchlist", _raise_watchlist_error)
+
+    exit_code = cli.main(
+        ["watchlist", "check", "--old", str(old_snapshot), "--new", str(new_snapshot), "--watchlist", str(watchlist)]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "sentinel watchlist failure" in captured.err
+
+
+def test_cli_watchlist_check_no_match_exits_zero(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+    watchlist = _write_watchlist(
+        tmp_path,
+        {"name": "none", "type_prefixes": ["microsoft.graph.zeta"], "change_types": ["property_added"]},
+    )
+
+    exit_code = cli.main(
+        ["watchlist", "check", "--old", str(old_snapshot), "--new", str(new_snapshot), "--watchlist", str(watchlist)]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "No matching watchlist changes." in captured.out
+
+
+def test_cli_watchlist_check_makes_no_network_calls(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+    watchlist = _write_watchlist(
+        tmp_path,
+        {"name": "identity", "type_prefixes": ["microsoft.graph.conditionalAccess"]},
+    )
+
+    def _blocked_socket(*args: object, **kwargs: object) -> socket.socket:
+        raise RuntimeError("network disabled")
+
+    monkeypatch.setattr(socket, "socket", _blocked_socket)
+
+    exit_code = cli.main(
+        ["watchlist", "check", "--old", str(old_snapshot), "--new", str(new_snapshot), "--watchlist", str(watchlist)]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "# Graph Schema Watchlist Report" in captured.out

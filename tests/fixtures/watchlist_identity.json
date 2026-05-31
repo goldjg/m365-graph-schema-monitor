@@ -1,0 +1,10 @@
+{
+  "name": "identity-test",
+  "type_prefixes": [
+    "microsoft.graph.conditionalAccess"
+  ],
+  "change_types": [
+    "property_added",
+    "property_removed"
+  ]
+}
