@@ -134,3 +134,40 @@ python -m pytest tests/
 
 - Expand parser coverage for additional OData surfaces if needed.
 - Add richer output/reporting surfaces while preserving deterministic core behavior.
+
+## Version comparison
+
+`version compare` answers three questions simultaneously over two local snapshots and their adjacent validated sidecars: did the `x_ms_schema_version` header change, did the raw payload hash change, and did parsed schema content change? All three dimensions are evaluated and combined into a single deterministic classification string.
+
+Both snapshots must have adjacent sidecars (written by `fetch`) that include a non-null `x_ms_schema_version` field. If a sidecar is missing, the sha256 does not match, or `x_ms_schema_version` is absent or null, the command exits with code 2 and a clear error message.
+
+```bash
+# Markdown output to stdout (default)
+python -m graph_schema_monitor version compare \
+  --old /tmp/graph-v1-2026-05-01.xml \
+  --new /tmp/graph-v1-2026-05-30.xml
+
+# JSON output written atomically to a file
+python -m graph_schema_monitor version compare \
+  --old /tmp/graph-v1-2026-05-01.xml \
+  --new /tmp/graph-v1-2026-05-30.xml \
+  --format json \
+  --out /tmp/graph-version-comparison.json
+```
+
+### Classification values
+
+The eight possible classification strings encode the three boolean dimensions (schema version changed / content SHA-256 changed / semantic diff present):
+
+| Classification | schema_version_changed | sha256_changed | semantic_changes_present | Meaning |
+|---|---|---|---|---|
+| `version_same_content_same_semantics_same` | no | no | no | Identical in all respects; confirm the fetch recorded the same snapshot. |
+| `version_same_content_same_semantics_changed` | no | no | yes | Parser sees changes but bytes are identical; unusual edge case. |
+| `version_same_content_changed_semantics_same` | no | yes | no | Payload bytes differ but parsed schema meaning is identical; likely whitespace or XML formatting. |
+| `version_same_content_changed_semantics_changed` | no | yes | yes | Content and semantics changed; version header was not bumped. |
+| `version_changed_content_same_semantics_same` | yes | no | no | Version header advanced but no content or semantic change detected; possible cosmetic bump. |
+| `version_changed_content_same_semantics_changed` | yes | no | yes | Version bumped and semantic changes present, but byte hash unchanged. |
+| `version_changed_content_changed_semantics_same` | yes | yes | no | Version bumped and payload changed, but parsed schema meaning is identical. |
+| `version_changed_content_changed_semantics_changed` | yes | yes | yes | Typical schema release; all three signals fire. |
+
+The JSON report uses `report_type: "version_comparison"` and includes the stable field set: `report_type`, `old_snapshot`, `new_snapshot`, `old_profile`, `new_profile`, `old_fetched_at_utc`, `new_fetched_at_utc`, `old_sha256`, `new_sha256`, `old_x_ms_schema_version`, `new_x_ms_schema_version`, `schema_version_changed`, `sha256_changed`, `semantic_change_count`, `semantic_changes_present`, `classification`.

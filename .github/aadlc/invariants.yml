@@ -35,6 +35,14 @@ invariants:
     rule: Watchlist evaluation must use only local watchlist JSON, local snapshots, and existing diff output. It must not introduce network calls, authentication, tenant access, or external correlation.
     severity: high
 
+  - id: version-comparison-local-only
+    name: Version comparison is local-only
+    rule: >
+      Version comparison must use only local snapshots, adjacent validated sidecars,
+      and existing diff output. It must not introduce network calls, authentication,
+      tenant access, or external correlation.
+    severity: high
+
   - id: pr-contract-respected
     name: PR contract respected
     rule: Execution must stay inside the current PR contract unless scope is explicitly amended.
