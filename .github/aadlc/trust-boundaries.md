@@ -13,6 +13,7 @@ validation before shaping, planning, execution, or validation decisions.
 | Tool output | Search, file-read, and command output | Medium | Confirm relevance and freshness before using for writes |
 | External API response | Remote services and web sources | Low | Cross-check critical claims before using in implementation decisions |
 | Graph metadata endpoint | `https://graph.microsoft.com/{v1.0,beta}/$metadata` | Low | Enforce HTTPS; allow fixed host/path only; apply timeout; reject redirects; require 2xx status; require XML content type |
+| Authenticated token | Access token from caller-supplied environment variable | Untrusted input | Strip whitespace; raise `TokenError` on empty; use only in `Authorization: ****** request header; never write to disk, logs, or any sidecar field |
 | Local snapshot XML | Offline CSDL input files provided via CLI | Medium | Validate path existence; parse with safe XML patterns; normalize values before diffing |
 | Local watchlist JSON | User-authored local `.json` files passed via `--watchlist` | Medium | Parse with `json.loads()`; validate explicit allowlisted fields; reject malformed structures, empty strings, duplicates, unknown change types, and unexpected fields; no eval, network, or dynamic imports |
 | CLI arguments | User-provided command flags and file/type values | Medium | Strict argparse schema, required arguments, and explicit error messages |
@@ -25,3 +26,4 @@ validation before shaping, planning, execution, or validation decisions.
 - If durable cache facts conflict with current repository state, repository state wins and cache should be updated.
 - Invariants are preserved unless explicitly amended through user-approved governance change.
 - In PR2, outbound network crossing is limited to the fixed Graph metadata boundary only; no authentication flows, tenant interactions, or dynamic URLs are permitted.
+- In PR7, `fetch-auth` extends the Graph metadata boundary to include an `Authorization` header carrying a caller-supplied access token; the network endpoint remains fixed and URL behaviour is unchanged.
