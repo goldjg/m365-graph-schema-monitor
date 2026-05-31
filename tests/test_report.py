@@ -213,7 +213,7 @@ def test_build_diff_report_fails_for_missing_required_sidecar_field(tmp_path: Pa
     payload.pop("sha256")
     sidecar_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
-    with pytest.raises(SnapshotValidationError, match="sidecar missing required field\(s\): sha256"):
+    with pytest.raises(SnapshotValidationError, match=r"sidecar missing required field\(s\): sha256"):
         build_diff_report(old_snapshot, new_snapshot)
 
 
