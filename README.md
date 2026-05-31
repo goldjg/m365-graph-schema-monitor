@@ -42,6 +42,48 @@ python -m graph_schema_monitor report summary --old /tmp/graph-v1.xml --new /tmp
 - No redirect following
 - Sidecar metadata includes only the explicit allowlisted fields
 
+## Authenticated metadata fetch
+
+`fetch-auth` fetches the same fixed Graph `$metadata` endpoints using an access token supplied via environment variable. The tool does **not** acquire, refresh, store, or cache tokens — the caller must supply a valid token.
+
+```bash
+export GRAPH_METADATA_TOKEN="<access-token>"
+python -m graph_schema_monitor fetch-auth \
+  --profile beta \
+  --out snapshots/lab/graph-beta-auth.xml \
+  --token-env GRAPH_METADATA_TOKEN \
+  --tenant-label lab
+```
+
+Arguments:
+
+| Argument | Required | Description |
+|---|---|---|
+| `--profile` | yes | `v1.0` or `beta` |
+| `--out` | yes | Output path for the XML snapshot |
+| `--token-env` | yes | Name of the environment variable containing the access token |
+| `--tenant-label` | no | Optional local display label stored in the sidecar for provenance (not a tenant ID) |
+| `--overwrite` | no | Overwrite existing output files |
+
+The token must be valid for Microsoft Graph (`https://graph.microsoft.com`). The command only talks to the same fixed `$metadata` endpoints as `fetch` — no arbitrary URL support.
+
+Authenticated sidecars include the same nine required fields as public sidecars, plus three additional optional provenance fields:
+
+| Field | Value |
+|---|---|
+| `source_kind` | `"authenticated_graph_metadata"` |
+| `auth_mode` | `"env_token"` |
+| `tenant_label` | User-supplied label string, or `null` |
+
+These extra fields are ignored by `snapshots validate`, `snapshots list`, `report diff`, `version compare`, and `watchlist check` — authenticated snapshots are fully compatible with all existing commands.
+
+**Security notes:**
+
+- Do not commit access tokens to source control.
+- Do not include access tokens in bug reports or issue descriptions.
+- Sidecars are safe to inspect and commit — they contain only provenance metadata and no token data.
+- The tool never writes the token value, Authorization header, token hash, or any token-derived data to disk, logs, stdout, or stderr.
+
 ## CLI usage
 
 ```bash

@@ -77,7 +77,7 @@ class FakeOpener:
     def __init__(self, response: FakeResponse | Exception) -> None:
         self._response = response
 
-    def open(self, url: object, data: object = None, timeout: int = 30) -> FakeResponse:
+    def open(self, url_or_request: object, data: object = None, timeout: int = 30) -> FakeResponse:
         if isinstance(self._response, Exception):
             raise self._response
         return self._response
@@ -269,11 +269,13 @@ def test_auth_fetch_rejects_unknown_profile_before_env_read(
     assert "MY_TOKEN" not in env_accessed
 
 
-def test_auth_fetch_does_not_accept_url_argument(capsys: pytest.CaptureFixture[str]) -> None:
+def test_auth_fetch_does_not_accept_url_argument(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     with pytest.raises(SystemExit) as exc_info:
         cli.main(
             ["fetch-auth", "--profile", "v1.0", "--url", "https://example.com/$metadata",
-             "--out", "/tmp/out.xml", "--token-env", "MY_TOKEN"]
+             "--out", str(tmp_path / "out.xml"), "--token-env", "MY_TOKEN"]
         )
     captured = capsys.readouterr()
     assert exc_info.value.code == 2
@@ -531,9 +533,11 @@ def test_auth_fetch_no_live_network(
 
 # ─── Token failure tests ──────────────────────────────────────────────────────
 
-def test_auth_fetch_missing_token_env_arg(capsys: pytest.CaptureFixture[str]) -> None:
+def test_auth_fetch_missing_token_env_arg(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     with pytest.raises(SystemExit) as exc_info:
-        cli.main(["fetch-auth", "--profile", "v1.0", "--out", "/tmp/out.xml"])
+        cli.main(["fetch-auth", "--profile", "v1.0", "--out", str(tmp_path / "out.xml")])
     captured = capsys.readouterr()
     assert exc_info.value.code == 2
     assert "--token-env" in captured.err

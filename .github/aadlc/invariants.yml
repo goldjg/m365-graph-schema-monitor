@@ -27,7 +27,10 @@ invariants:
 
   - id: network-boundary-fixed
     name: Network boundary fixed
-    rule: Outbound network calls are limited to the allowlisted Graph metadata endpoints; no dynamic or user-supplied URLs are permitted.
+    rule: >
+      Outbound metadata acquisition is limited to the allowlisted Graph `$metadata` endpoints
+      for v1.0 and beta. Authentication mode may change request headers but must not make URLs
+      dynamic or user-supplied.
     severity: critical
 
   - id: watchlists-local-only
@@ -52,6 +55,15 @@ invariants:
     name: Minimum sufficient reasoning depth
     rule: Reasoning depth must be escalated only when risk, uncertainty, or novelty justifies the cost.
     severity: high
+
+  - id: auth-token-not-persisted
+    name: Auth token not persisted
+    rule: >
+      Access tokens supplied via environment variable for authenticated acquisition must not
+      be written to disk, logs, stdout, stderr, or any persisted artefact. Token values,
+      hashes, or any token-derived data must not appear in sidecars, snapshots, or any
+      committed file.
+    severity: critical
 
   - id: invariant-amendment-governance
     name: Invariant amendment governance
