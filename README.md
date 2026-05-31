@@ -51,9 +51,10 @@ python -m graph_schema_monitor diff --old tests/fixtures/schema_old.xml --new te
 python -m graph_schema_monitor snapshots list --dir /tmp
 python -m graph_schema_monitor snapshots validate --dir /tmp
 python -m graph_schema_monitor report diff --old /tmp/graph-v1.xml --new /tmp/graph-beta.xml
+python -m graph_schema_monitor report diff --old /tmp/graph-v1.xml --new /tmp/graph-beta.xml --format json
 ```
 
-`report diff` automatically resolves sidecars as `<snapshot-path>.json` and defaults to markdown output. Use `--out` to write the rendered report to a file; otherwise it prints to stdout.
+`report diff` automatically resolves sidecars as `<snapshot-path>.json`, defaults to markdown output, and also supports deterministic JSON output via `--format json`. Use `--out` to write the rendered report to a file atomically; otherwise it prints to stdout. Missing sidecars are allowed for reports and render unknown metadata fields, while malformed or incomplete sidecars still fail validation.
 
 ## Testing
 
@@ -66,7 +67,7 @@ python -m pytest tests/
 - Parser scope is intentionally limited to `EntityType` and `ComplexType` declared properties.
 - Diff identity is `fully-qualified-type-name + property-name` (declared-only, no inheritance flattening).
 - `fetch` only supports the `v1.0` and `beta` public Graph `$metadata` endpoints.
-- `report diff` requires locally resolved sidecars for both input snapshots.
+- `report diff` renders unknown metadata when an adjacent sidecar is missing, but malformed or incomplete sidecars still fail.
 - No authentication, tenant access, OAuth, MSAL, or Graph SDK integration.
 - No arbitrary URL input, scheduler, database, web UI, changelog correlation, canary tenant logic, or AI summarization.
 

@@ -69,7 +69,9 @@ def test_build_diff_report_renders_grouped_markdown_sections(tmp_path: Path) -> 
     assert "### Property Collection Shape Changed" in report
     assert "microsoft.graph.conditionalAccessPolicy.templateId" in report
     assert "microsoft.graph.conditionalAccessConditionSet.clientApplications" in report
-    assert report.count("None.") == 5
+    assert "### Types Added\n\nNone." in report
+    assert "### Types Removed\n\nNone." in report
+    assert "### Property Types Changed\n\nNone." in report
 
 
 def test_build_diff_report_supports_deterministic_json_output(tmp_path: Path) -> None:
