@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Sequence
 
 from .diff import changes_to_json, diff_snapshots, render_changes_text
-from .fetcher import FetchError, fetch_snapshot
+from .fetcher import FetchError, fetch_authenticated_snapshot, fetch_snapshot
 from .parser import parse_csdl_file
 from .report import build_diff_report, build_summary_report
 from .snapshots import (
@@ -61,6 +61,24 @@ def _build_parser() -> argparse.ArgumentParser:
     fetch_parser.add_argument("--out", required=True, dest="output_path", help="Output path for XML snapshot")
     fetch_parser.add_argument("--overwrite", action="store_true", help="Overwrite existing output files")
     fetch_parser.set_defaults(handler=_fetch)
+
+    fetch_auth_parser = subparsers.add_parser("fetch-auth", help="Fetch an authenticated Graph metadata snapshot")
+    fetch_auth_parser.add_argument("--profile", required=True, help="Graph metadata profile: v1.0 or beta")
+    fetch_auth_parser.add_argument("--out", required=True, dest="output_path", help="Output path for XML snapshot")
+    fetch_auth_parser.add_argument(
+        "--token-env",
+        required=True,
+        dest="token_env",
+        help="Name of environment variable containing the access token",
+    )
+    fetch_auth_parser.add_argument(
+        "--tenant-label",
+        dest="tenant_label",
+        default=None,
+        help="Optional local label for provenance (display only)",
+    )
+    fetch_auth_parser.add_argument("--overwrite", action="store_true", help="Overwrite existing output files")
+    fetch_auth_parser.set_defaults(handler=_fetch_auth)
 
     snapshots_parser = subparsers.add_parser("snapshots", help="Inventory local snapshots")
     snapshots_subparsers = snapshots_parser.add_subparsers(dest="snapshots_command", required=True)
@@ -208,6 +226,19 @@ def _fetch(args: argparse.Namespace) -> int:
         overwrite=args.overwrite,
     )
     print(f"Fetched {result.source_url} -> {result.output_path}")
+    print(f"Sidecar: {result.sidecar_path}")
+    return 0
+
+
+def _fetch_auth(args: argparse.Namespace) -> int:
+    result = fetch_authenticated_snapshot(
+        args.profile,
+        args.output_path,
+        token_env=args.token_env,
+        tenant_label=args.tenant_label,
+        overwrite=args.overwrite,
+    )
+    print(f"Fetched authenticated {result.source_url} -> {result.output_path}")
     print(f"Sidecar: {result.sidecar_path}")
     return 0
 
