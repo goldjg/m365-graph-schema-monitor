@@ -23,7 +23,8 @@ unresolved question should carry forward.
 - `src/graph_schema_monitor/report.py` renders deterministic diff and summary reports over local snapshots.
 - `src/graph_schema_monitor/report_filters.py` applies deterministic report filtering and summary aggregation over `DiffChange` values.
 - `src/graph_schema_monitor/watchlists.py` loads and validates local watchlist JSON, matches `DiffChange` values with OR-within and AND-across semantics, and renders deterministic markdown/json watchlist reports.
-- `src/graph_schema_monitor/cli.py` provides `fetch`, `inspect`, `diff`, `snapshots`, `report`, and `watchlist` commands.
+- `src/graph_schema_monitor/versioning.py` performs local-only version/hash/semantic comparison over validated snapshot bundles; it uses `load_snapshot_bundle()`, `diff_snapshots()`, and `SnapshotValidationError` without modifying them. `VersionComparison` dataclass fields: `old_snapshot`, `new_snapshot` (Path); `old_profile`, `new_profile`, `old_fetched_at_utc`, `new_fetched_at_utc` (str|None); `old_sha256`, `new_sha256`, `old_x_ms_schema_version`, `new_x_ms_schema_version` (str, validated non-empty); `schema_version_changed`, `sha256_changed`, `semantic_changes_present` (bool); `semantic_change_count` (int); `classification` (str).
+- `src/graph_schema_monitor/cli.py` provides `fetch`, `inspect`, `diff`, `snapshots`, `report`, `watchlist`, and `version` commands.
 - `tests/fixtures/` stores small hand-authored XML snapshots used for deterministic offline tests.
 
 ## Core invariants
@@ -32,6 +33,8 @@ unresolved question should carry forward.
 - Nullable defaults to `true` when absent per OData semantics.
 - Diff identity is `fully-qualified-type-name + property-name` using declared properties only.
 - Runtime dependencies remain standard-library-only in PR2.
+- watchlists-local-only: see invariants.yml.
+- version-comparison-local-only: see invariants.yml.
 
 ## Trust boundaries
 - User input boundary: CLI paths and type names are untrusted and must be validated for existence/shape.
@@ -62,4 +65,4 @@ unresolved question should carry forward.
 - Should a future live integration test be added behind `GRAPH_SCHEMA_MONITOR_LIVE_TESTS=1` while remaining skipped by default in CI?
 
 ## Last updated
-2026-05-31 by Copilot
+2026-05-31 by Copilot (PR6)
