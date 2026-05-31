@@ -20,7 +20,9 @@ unresolved question should carry forward.
 - `src/graph_schema_monitor/parser.py` parses local CSDL/XML into a deterministic in-memory snapshot.
 - `src/graph_schema_monitor/diff.py` compares two snapshots and emits deterministic change records.
 - `src/graph_schema_monitor/fetcher.py` performs constrained snapshot acquisition from fixed Microsoft Graph metadata endpoints and writes local XML plus sidecar metadata.
-- `src/graph_schema_monitor/cli.py` provides `fetch`, `inspect`, and `diff` commands.
+- `src/graph_schema_monitor/report.py` renders deterministic diff and summary reports over local snapshots.
+- `src/graph_schema_monitor/report_filters.py` applies deterministic report filtering and summary aggregation over `DiffChange` values.
+- `src/graph_schema_monitor/cli.py` provides `fetch`, `inspect`, `diff`, `snapshots`, and `report` commands.
 - `tests/fixtures/` stores small hand-authored XML snapshots used for deterministic offline tests.
 
 ## Core invariants
@@ -37,7 +39,7 @@ unresolved question should carry forward.
 - Output boundary: JSON/text output must be deterministic and avoid leaking sensitive context; fetch sidecars must include only the explicit metadata allowlist.
 
 ## Known sharp edges
-- Graph metadata can express equivalent nullability via absent `Nullable` vs explicit `Nullable=\"true\"`.
+- Graph metadata can express equivalent nullability via absent `Nullable` vs explicit `Nullable="true"`.
 - Type strings may use `Collection(...)` wrappers that must be normalized and tracked for shape diffs.
 - XML element order is not a stable semantic ordering and should not drive diff ordering.
 
@@ -58,4 +60,4 @@ unresolved question should carry forward.
 - Should a future live integration test be added behind `GRAPH_SCHEMA_MONITOR_LIVE_TESTS=1` while remaining skipped by default in CI?
 
 ## Last updated
-2026-05-30 by Copilot
+2026-05-31 by Copilot

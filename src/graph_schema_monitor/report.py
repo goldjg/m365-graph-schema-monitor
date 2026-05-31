@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from .diff import DiffChange, changes_to_json, diff_snapshots
+from .report_filters import filter_changes, summarise_changes
 from .snapshots import SnapshotBundle, load_snapshot_bundle
 
 
@@ -32,8 +33,47 @@ JSON_DIFF_REPORT_FIELDS = (
     "changes",
 )
 
+SUMMARY_JSON_FIELDS = (
+    "total_changes",
+    "by_change_type",
+    "top_type_prefixes",
+)
+
 
 def build_diff_report(
+    old_snapshot_path: str | Path,
+    new_snapshot_path: str | Path,
+    *,
+    output_format: str = "markdown",
+    change_type: str | None = None,
+    type_prefix: str | None = None,
+    type_name: str | None = None,
+    limit: int | None = None,
+) -> str:
+    old_bundle = load_snapshot_bundle(old_snapshot_path, allow_missing_sidecar=True)
+    new_bundle = load_snapshot_bundle(new_snapshot_path, allow_missing_sidecar=True)
+    changes = diff_snapshots(old_bundle.snapshot, new_bundle.snapshot)
+    filtered_changes = filter_changes(
+        changes,
+        change_type=change_type,
+        type_prefix=type_prefix,
+        type_name=type_name,
+        limit=limit,
+    )
+    if output_format == "json":
+        return render_json_diff_report(old_bundle, new_bundle, filtered_changes)
+    filters = _build_active_filters(
+        change_type=change_type,
+        type_prefix=type_prefix,
+        type_name=type_name,
+        limit=limit,
+    )
+    if not filters:
+        return render_markdown_diff_report(old_bundle, new_bundle, filtered_changes)
+    return render_filtered_markdown_diff_report(old_bundle, new_bundle, filtered_changes, filters)
+
+
+def build_summary_report(
     old_snapshot_path: str | Path,
     new_snapshot_path: str | Path,
     *,
@@ -42,9 +82,10 @@ def build_diff_report(
     old_bundle = load_snapshot_bundle(old_snapshot_path, allow_missing_sidecar=True)
     new_bundle = load_snapshot_bundle(new_snapshot_path, allow_missing_sidecar=True)
     changes = diff_snapshots(old_bundle.snapshot, new_bundle.snapshot)
+    summary = summarise_changes(changes)
     if output_format == "json":
-        return render_json_diff_report(old_bundle, new_bundle, changes)
-    return render_markdown_diff_report(old_bundle, new_bundle, changes)
+        return render_json_summary_report(summary)
+    return render_markdown_summary_report(old_bundle, new_bundle, summary)
 
 
 def render_markdown_diff_report(
@@ -73,6 +114,20 @@ def render_markdown_diff_report(
         lines.append("")
         lines.extend(_render_group(change_type, group))
     return "\n".join(lines)
+
+
+def render_filtered_markdown_diff_report(
+    old_bundle: SnapshotBundle,
+    new_bundle: SnapshotBundle,
+    changes: list[DiffChange],
+    filters: list[tuple[str, str]],
+) -> str:
+    report = render_markdown_diff_report(old_bundle, new_bundle, changes)
+    marker = "\n## Changes\n"
+    filter_lines = ["## Filters Applied", ""]
+    filter_lines.extend(f"- {label}: {value}" for label, value in filters)
+    filter_section = "\n".join(filter_lines)
+    return report.replace(marker, f"\n{filter_section}\n\n## Changes\n", 1)
 
 
 def _render_snapshot_details(label: str, bundle: SnapshotBundle) -> list[str]:
@@ -113,6 +168,37 @@ def render_json_diff_report(
     return json.dumps(approved_payload, indent=2)
 
 
+def render_markdown_summary_report(
+    old_bundle: SnapshotBundle,
+    new_bundle: SnapshotBundle,
+    summary: dict[str, Any],
+) -> str:
+    lines = ["# Graph Schema Summary Report", "", "## Metadata", ""]
+    lines.extend(_render_snapshot_details("Old Snapshot", old_bundle))
+    lines.extend(["", *(_render_snapshot_details("New Snapshot", new_bundle)), "", "## Summary", ""])
+    lines.append(f"- Total changes: {summary['total_changes']}")
+    lines.extend([
+        "",
+        "### Changes by Type",
+        "",
+        "| Change Type | Count |",
+        "|---|---|",
+    ])
+    for change_type, _heading in CHANGE_GROUPS:
+        lines.append(f"| {change_type} | {summary['by_change_type'][change_type]} |")
+    lines.extend(["", "### Top Affected Type Prefixes", "", "| Type Prefix | Count |", "|---|---|"])
+    for entry in summary["top_type_prefixes"]:
+        lines.append(f"| {entry['prefix']} | {entry['count']} |")
+    if not summary["top_type_prefixes"]:
+        lines.append("| None | 0 |")
+    return "\n".join(lines)
+
+
+def render_json_summary_report(summary: dict[str, Any]) -> str:
+    approved_payload = {field: summary[field] for field in SUMMARY_JSON_FIELDS}
+    return json.dumps(approved_payload, indent=2)
+
+
 def _format_value(value: Any) -> str:
     return json.dumps(value, sort_keys=True)
 
@@ -135,3 +221,22 @@ def _render_group(change_type: str, changes: list[DiffChange]) -> list[str]:
 
 def _render_string(value: str | None) -> str:
     return "unknown" if value is None else value
+
+
+def _build_active_filters(
+    *,
+    change_type: str | None,
+    type_prefix: str | None,
+    type_name: str | None,
+    limit: int | None,
+) -> list[tuple[str, str]]:
+    filters: list[tuple[str, str]] = []
+    if change_type is not None:
+        filters.append(("change-type", change_type))
+    if type_prefix is not None:
+        filters.append(("type-prefix", type_prefix))
+    if type_name is not None:
+        filters.append(("type-name", type_name))
+    if limit is not None:
+        filters.append(("limit", str(limit)))
+    return filters
