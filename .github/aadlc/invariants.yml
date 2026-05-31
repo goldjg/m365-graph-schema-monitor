@@ -78,3 +78,12 @@ invariants:
     name: Invariant amendment governance
     rule: Agents must preserve invariants unless the user explicitly amends the invariant or opens a separate governance change.
     severity: high
+
+  - id: workflow-bundles-local-only
+    name: Workflow bundles are local-only
+    rule: >
+      Workflow bundle generation must use only local snapshots, adjacent validated sidecars,
+      optional local watchlists, and existing local renderers. It must not introduce fetching,
+      network calls, authentication, token handling, tenant discovery, external correlation,
+      scheduler behaviour, or database persistence.
+    severity: high

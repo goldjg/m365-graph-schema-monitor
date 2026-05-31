@@ -127,6 +127,74 @@ Arguments:
 
 The command does not list individual schema changes — use `report diff`, `report summary`, or `watchlist check` for that.
 
+## Local evidence workflow bundle
+
+`workflow compare-public-auth` orchestrates the full public-vs-authenticated evidence chain into a single deterministic report directory. It consumes already-fetched local XML snapshots and does not fetch anything, acquire tokens, or read environment variables.
+
+```bash
+python -m graph_schema_monitor workflow compare-public-auth \
+  --public snapshots/graph-beta-public.xml \
+  --authenticated snapshots/graph-beta-auth.xml \
+  --out-dir reports/beta-public-auth
+```
+
+With an optional local watchlist and `--overwrite`:
+
+```bash
+python -m graph_schema_monitor workflow compare-public-auth \
+  --public snapshots/graph-beta-public.xml \
+  --authenticated snapshots/graph-beta-auth.xml \
+  --watchlist examples/watchlists/identity-critical.json \
+  --out-dir reports/beta-public-auth \
+  --overwrite
+```
+
+Arguments:
+
+| Argument | Required | Description |
+|---|---|---|
+| `--public` | yes | Path to public/unauthenticated metadata snapshot XML |
+| `--authenticated` | yes | Path to authenticated metadata snapshot XML |
+| `--out-dir` | yes | Output directory for the evidence bundle |
+| `--watchlist` | no | Optional path to a local watchlist JSON file |
+| `--allow-profile-mismatch` | no | Allow the two snapshots to have different profiles |
+| `--overwrite` | no | Overwrite existing output files (default: fail if any exist) |
+
+**Generated files (without `--watchlist`):**
+
+| File | Content |
+|---|---|
+| `source-comparison.json` | Public-vs-authenticated source provenance comparison (JSON) |
+| `source-comparison.md` | Public-vs-authenticated source provenance comparison (Markdown) |
+| `version-comparison.json` | Schema version / hash / semantic comparison (JSON) |
+| `version-comparison.md` | Schema version / hash / semantic comparison (Markdown) |
+| `summary.json` | Unfiltered diff summary (JSON) |
+| `summary.md` | Unfiltered diff summary (Markdown) |
+| `manifest.json` | Bundle manifest listing inputs and generated outputs |
+
+With `--watchlist`, two additional files are written: `watchlist.json` and `watchlist.md`.
+
+**`manifest.json` fields:**
+
+| Field | Description |
+|---|---|
+| `manifest_type` | Always `"workflow_bundle"` |
+| `workflow` | Always `"compare_public_authenticated"` |
+| `public_snapshot` | Input path to the public snapshot |
+| `authenticated_snapshot` | Input path to the authenticated snapshot |
+| `watchlist` | Input path to the watchlist, or `null` |
+| `allow_profile_mismatch` | Whether profile mismatch was allowed |
+| `outputs` | Map of output keys to relative filenames within the bundle directory |
+
+The manifest contains no wall-clock timestamps, no tokens, and no absolute path rewriting of relative input paths.
+
+**Notes:**
+
+- The command does not fetch anything. Run `fetch` and `fetch-auth` beforehand to acquire the local snapshot files.
+- The command does not read or use tokens, environment variables, or tenant IDs.
+- There is no scheduler, database, web UI, or changelog correlation.
+- If any planned output file already exists and `--overwrite` is not supplied, the command exits 2 before writing anything.
+
 ## CLI usage
 
 ```bash
