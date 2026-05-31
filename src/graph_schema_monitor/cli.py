@@ -153,7 +153,3 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (FetchError, SnapshotValidationError) as exc:
         print(str(exc), file=sys.stderr)
         return exc.exit_code
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

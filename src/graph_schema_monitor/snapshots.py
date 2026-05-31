@@ -58,7 +58,8 @@ def discover_snapshot_paths(directory: str | Path) -> tuple[Path, list[Path]]:
     root = Path(directory)
     if not root.exists() or not root.is_dir():
         raise SnapshotValidationError(f"Snapshot directory does not exist: {root}")
-    snapshots = sorted((path for path in root.rglob("*.xml") if path.is_file()), key=lambda path: path.relative_to(root).as_posix())
+    candidates = (path for path in root.rglob("*.xml") if path.is_file())
+    snapshots = sorted(candidates, key=lambda path: path.relative_to(root).as_posix())
     return root, snapshots
 
 
