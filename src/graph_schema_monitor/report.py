@@ -80,14 +80,22 @@ def render_json_diff_report(
     new_bundle: SnapshotBundle,
     changes: list[DiffChange],
 ) -> str:
+    old_sidecar = old_bundle.sidecar
+    new_sidecar = new_bundle.sidecar
     payload = {
-        "metadata": {
-            "old_snapshot": _snapshot_metadata_to_json(old_bundle),
-            "new_snapshot": _snapshot_metadata_to_json(new_bundle),
-        },
+        "report_type": "schema_diff",
+        "old_snapshot": str(old_bundle.snapshot_path),
+        "new_snapshot": str(new_bundle.snapshot_path),
+        "old_profile": None if old_sidecar is None else old_sidecar.profile,
+        "new_profile": None if new_sidecar is None else new_sidecar.profile,
+        "old_fetched_at_utc": None if old_sidecar is None else old_sidecar.fetched_at_utc,
+        "new_fetched_at_utc": None if new_sidecar is None else new_sidecar.fetched_at_utc,
+        "old_sha256": None if old_sidecar is None else old_sidecar.sha256,
+        "new_sha256": None if new_sidecar is None else new_sidecar.sha256,
+        "total_changes": len(changes),
         "changes": changes_to_json(changes),
     }
-    return json.dumps(payload, indent=2, sort_keys=True)
+    return json.dumps(payload, indent=2)
 
 
 def _format_value(value: Any) -> str:
@@ -108,19 +116,6 @@ def _render_group(change_type: str, changes: list[DiffChange]) -> list[str]:
         f"old=`{_format_value(change.old_value)}` new=`{_format_value(change.new_value)}`"
         for change in changes
     ]
-
-
-def _snapshot_metadata_to_json(bundle: SnapshotBundle) -> dict[str, Any]:
-    sidecar = bundle.sidecar
-    return {
-        "snapshot_path": str(bundle.snapshot_path),
-        "sidecar_path": str(bundle.sidecar_path),
-        "profile": None if sidecar is None else sidecar.profile,
-        "source_url": None if sidecar is None else sidecar.source_url,
-        "fetched_at_utc": None if sidecar is None else sidecar.fetched_at_utc,
-        "sha256": None if sidecar is None else sidecar.sha256,
-        "type_count": len(bundle.snapshot.types),
-    }
 
 
 def _render_string(value: str | None) -> str:

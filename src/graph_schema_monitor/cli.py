@@ -18,6 +18,7 @@ from .snapshots import (
     inspect_snapshot_directory,
     render_snapshot_list,
     render_snapshot_validation,
+    render_snapshot_warnings,
 )
 
 
@@ -126,8 +127,11 @@ def _fetch(args: argparse.Namespace) -> int:
 
 
 def _snapshots_list(args: argparse.Namespace) -> int:
-    inspections = inspect_snapshot_directory(args.directory)
+    inspections = inspect_snapshot_directory(args.directory, missing_sidecar_is_error=False)
     print(render_snapshot_list(inspections))
+    warnings = render_snapshot_warnings(inspections)
+    if warnings:
+        print(warnings, file=sys.stderr)
     return 0
 
 

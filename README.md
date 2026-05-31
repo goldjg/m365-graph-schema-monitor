@@ -54,7 +54,9 @@ python -m graph_schema_monitor report diff --old /tmp/graph-v1.xml --new /tmp/gr
 python -m graph_schema_monitor report diff --old /tmp/graph-v1.xml --new /tmp/graph-beta.xml --format json
 ```
 
-`report diff` automatically resolves sidecars as `<snapshot-path>.json`, defaults to markdown output, and also supports deterministic JSON output via `--format json`. Use `--out` to write the rendered report to a file atomically; otherwise it prints to stdout. Missing sidecars are allowed for reports and render unknown metadata fields, while malformed or incomplete sidecars still fail validation.
+`report diff` automatically resolves sidecars as `<snapshot-path>.json`, defaults to markdown output, and also supports deterministic JSON output via `--format json`. The JSON report uses the approved top-level schema: `report_type`, `old_snapshot`, `new_snapshot`, `old_profile`, `new_profile`, `old_fetched_at_utc`, `new_fetched_at_utc`, `old_sha256`, `new_sha256`, `total_changes`, and `changes`. Use `--out` to write the rendered report to a file atomically; otherwise it prints to stdout. Missing sidecars are allowed for reports and render unknown metadata fields, while malformed or incomplete sidecars still fail validation.
+
+`snapshots list` writes the inventory table to stdout and emits warning diagnostics to stderr. Missing sidecars are warnings in list mode, while `snapshots validate` treats them as errors and exits non-zero for invalid inventory.
 
 ## Testing
 

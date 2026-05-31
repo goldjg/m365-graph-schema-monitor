@@ -92,6 +92,18 @@ def test_snapshot_validation_reports_missing_sidecar(tmp_path: Path) -> None:
     assert rendered == f"ERROR\torphan.xml\tmissing sidecar: {snapshot_path}.json"
 
 
+def test_snapshot_list_reports_missing_sidecar_as_warning(tmp_path: Path) -> None:
+    snapshot_path = tmp_path / "orphan.xml"
+    shutil.copyfile(FIXTURES_DIR / "schema_old.xml", snapshot_path)
+
+    inspections = inspect_snapshot_directory(tmp_path, missing_sidecar_is_error=False)
+    rendered = render_snapshot_list(inspections)
+
+    assert inspections[0].status == "ok"
+    assert inspections[0].inventory_status == "warning"
+    assert rendered == "SNAPSHOT\tSTATUS\tTYPES\tPROFILE\tFETCHED_AT_UTC\tSHA256\norphan.xml\twarning\t2\t\t\t"
+
+
 def test_snapshot_validation_warns_on_extra_sidecar_fields(tmp_path: Path) -> None:
     snapshot_path = _write_snapshot_with_sidecar(
         tmp_path,
@@ -204,3 +216,21 @@ def test_load_snapshot_bundle_accepts_sidecar_keys_out_of_order(tmp_path: Path) 
 
     assert bundle.sidecar is not None
     assert bundle.sidecar.sha256 == payload["sha256"]
+
+
+def test_snapshot_inventory_ignores_symlinked_candidates_outside_root(tmp_path: Path) -> None:
+    outside_dir = tmp_path.parent / "outside-root"
+    outside_dir.mkdir()
+    outside_snapshot = _write_snapshot_with_sidecar(
+        outside_dir,
+        name="outside.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    (tmp_path / "linked.xml").symlink_to(outside_snapshot)
+    (tmp_path / "linked.xml.json").symlink_to(sidecar_path_for_snapshot(outside_snapshot))
+
+    inspections = inspect_snapshot_directory(tmp_path)
+
+    assert inspections == []

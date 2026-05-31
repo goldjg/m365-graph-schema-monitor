@@ -108,6 +108,20 @@ def test_cli_snapshots_list_outputs_inventory(tmp_path: Path, capsys: pytest.Cap
     assert "snapshot.xml\tok\t2\tv1.0\t2026-05-30T20:00:00Z" in captured.out
 
 
+def test_cli_snapshots_list_sends_missing_sidecar_warning_to_stderr(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    shutil.copyfile(FIXTURES_DIR / "schema_old.xml", tmp_path / "snapshot.xml")
+
+    exit_code = cli.main(["snapshots", "list", "--dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "snapshot.xml\twarning\t2\t\t\t" in captured.out
+    assert f"WARNING\tsnapshot.xml\tmissing sidecar: {tmp_path / 'snapshot.xml.json'}" in captured.err
+
+
 def test_cli_snapshots_validate_returns_nonzero_for_invalid_snapshot(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -168,7 +182,8 @@ def test_cli_report_diff_supports_json_output(tmp_path: Path, capsys: pytest.Cap
     captured = capsys.readouterr()
     assert exit_code == 0
     payload = json.loads(captured.out)
-    assert payload["metadata"]["old_snapshot"]["profile"] == "v1.0"
+    assert payload["report_type"] == "schema_diff"
+    assert payload["old_snapshot"] == str(old_snapshot)
     assert any(item["property_name"] == "templateId" for item in payload["changes"])
 
 

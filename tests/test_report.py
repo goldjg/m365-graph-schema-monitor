@@ -95,12 +95,48 @@ def test_build_diff_report_supports_deterministic_json_output(tmp_path: Path) ->
 
     assert first == second
     payload = json.loads(first)
-    assert payload["metadata"]["old_snapshot"]["profile"] == "v1.0"
-    assert payload["metadata"]["new_snapshot"]["profile"] == "beta"
+    assert payload == {
+        "report_type": "schema_diff",
+        "old_snapshot": str(old_snapshot),
+        "new_snapshot": str(new_snapshot),
+        "old_profile": "v1.0",
+        "new_profile": "beta",
+        "old_fetched_at_utc": "2026-05-30T20:00:00Z",
+        "new_fetched_at_utc": "2026-05-31T20:00:00Z",
+        "old_sha256": hashlib.sha256(old_snapshot.read_bytes()).hexdigest(),
+        "new_sha256": hashlib.sha256(new_snapshot.read_bytes()).hexdigest(),
+        "total_changes": 4,
+        "changes": payload["changes"],
+    }
     assert any(
         item["change_type"] == "property_added" and item["property_name"] == "templateId"
         for item in payload["changes"]
     )
+
+
+def test_build_diff_report_json_uses_null_metadata_for_missing_sidecar(tmp_path: Path) -> None:
+    old_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="old.xml",
+        fixture_name="schema_old.xml",
+        profile="v1.0",
+        fetched_at_utc="2026-05-30T20:00:00Z",
+    )
+    new_snapshot = _write_snapshot_with_sidecar(
+        tmp_path,
+        name="new.xml",
+        fixture_name="schema_new.xml",
+        profile="beta",
+        fetched_at_utc="2026-05-31T20:00:00Z",
+    )
+    sidecar_path_for_snapshot(old_snapshot).unlink()
+
+    payload = json.loads(build_diff_report(old_snapshot, new_snapshot, output_format="json"))
+
+    assert payload["old_snapshot"] == str(old_snapshot)
+    assert payload["old_profile"] is None
+    assert payload["old_fetched_at_utc"] is None
+    assert payload["old_sha256"] is None
 
 
 def test_build_diff_report_renders_unknown_metadata_for_missing_sidecar(tmp_path: Path) -> None:

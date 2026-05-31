@@ -46,6 +46,14 @@ class SnapshotInspection:
     def status(self) -> str:
         return "ok" if not self.errors else "invalid"
 
+    @property
+    def inventory_status(self) -> str:
+        if self.errors:
+            return "invalid"
+        if self.warnings:
+            return "warning"
+        return "ok"
+
 
 class SnapshotValidationError(Exception):
     exit_code = 2
@@ -59,16 +67,23 @@ def discover_snapshot_paths(directory: str | Path) -> tuple[Path, list[Path], li
     root = Path(directory)
     if not root.exists() or not root.is_dir():
         raise SnapshotValidationError(f"Snapshot directory does not exist: {root}")
-    snapshot_candidates = (path for path in root.rglob("*.xml") if path.is_file())
-    sidecar_candidates = (path for path in root.rglob("*.xml.json") if path.is_file())
+    resolved_root = root.resolve()
+    snapshot_candidates = (
+        path for path in root.rglob("*.xml") if path.is_file() and _is_path_within_root(path, resolved_root)
+    )
+    sidecar_candidates = (
+        path for path in root.rglob("*.xml.json") if path.is_file() and _is_path_within_root(path, resolved_root)
+    )
     snapshots = sorted(snapshot_candidates, key=lambda path: path.relative_to(root).as_posix())
     sidecars = sorted(sidecar_candidates, key=lambda path: path.relative_to(root).as_posix())
     return root, snapshots, sidecars
 
 
-def inspect_snapshot_directory(directory: str | Path) -> list[SnapshotInspection]:
+def inspect_snapshot_directory(directory: str | Path, *, missing_sidecar_is_error: bool = True) -> list[SnapshotInspection]:
     root, snapshots, sidecars = discover_snapshot_paths(directory)
-    inspections = [inspect_snapshot_file(path, root=root) for path in snapshots]
+    inspections = [
+        inspect_snapshot_file(path, root=root, missing_sidecar_is_error=missing_sidecar_is_error) for path in snapshots
+    ]
 
     snapshot_paths = set(snapshots)
     for sidecar_path in sidecars:
@@ -90,7 +105,12 @@ def inspect_snapshot_directory(directory: str | Path) -> list[SnapshotInspection
     return sorted(inspections, key=_inspection_sort_key)
 
 
-def inspect_snapshot_file(snapshot_path: str | Path, *, root: Path | None = None) -> SnapshotInspection:
+def inspect_snapshot_file(
+    snapshot_path: str | Path,
+    *,
+    root: Path | None = None,
+    missing_sidecar_is_error: bool = True,
+) -> SnapshotInspection:
     path = Path(snapshot_path)
     display_path = path.relative_to(root).as_posix() if root is not None else str(path)
     sidecar_path = sidecar_path_for_snapshot(path)
@@ -106,7 +126,11 @@ def inspect_snapshot_file(snapshot_path: str | Path, *, root: Path | None = None
         errors.append(f"snapshot parse failed: {exc}")
 
     if not sidecar_path.exists() or not sidecar_path.is_file():
-        errors.append(f"missing sidecar: {sidecar_path}")
+        message = f"missing sidecar: {sidecar_path}"
+        if missing_sidecar_is_error:
+            errors.append(message)
+        else:
+            warnings.append(message)
     else:
         try:
             sidecar, sidecar_warnings = _load_snapshot_sidecar_result(path, sidecar_path=sidecar_path)
@@ -160,7 +184,7 @@ def render_snapshot_list(inspections: list[SnapshotInspection]) -> str:
             "\t".join(
                 [
                     inspection.relative_path,
-                    inspection.status,
+                    inspection.inventory_status,
                     "" if inspection.type_count is None else str(inspection.type_count),
                     "" if sidecar is None else sidecar.profile,
                     "" if sidecar is None else sidecar.fetched_at_utc,
@@ -184,6 +208,15 @@ def render_snapshot_validation(inspections: list[SnapshotInspection]) -> str:
             continue
         for error in inspection.errors:
             lines.append(f"ERROR\t{inspection.relative_path}\t{error}")
+    return "\n".join(lines)
+
+
+def render_snapshot_warnings(inspections: list[SnapshotInspection]) -> str:
+    lines = [
+        f"WARNING\t{inspection.relative_path}\t{warning}"
+        for inspection in inspections
+        for warning in inspection.warnings
+    ]
     return "\n".join(lines)
 
 
@@ -326,3 +359,11 @@ def _apply_duplicate_errors(inspections: list[SnapshotInspection]) -> list[Snaps
         for index in indexes:
             updated[index] = replace(updated[index], errors=updated[index].errors + (message,))
     return updated
+
+
+def _is_path_within_root(path: Path, resolved_root: Path) -> bool:
+    try:
+        path.resolve().relative_to(resolved_root)
+    except ValueError:
+        return False
+    return True
