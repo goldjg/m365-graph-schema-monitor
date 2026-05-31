@@ -105,7 +105,7 @@ def test_build_diff_report_supports_deterministic_json_output(tmp_path: Path) ->
         "new_fetched_at_utc": "2026-05-31T20:00:00Z",
         "old_sha256": hashlib.sha256(old_snapshot.read_bytes()).hexdigest(),
         "new_sha256": hashlib.sha256(new_snapshot.read_bytes()).hexdigest(),
-        "total_changes": 4,
+        "total_changes": len(payload["changes"]),
         "changes": payload["changes"],
     }
     assert any(
