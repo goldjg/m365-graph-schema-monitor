@@ -20,6 +20,11 @@ from .snapshots import (
     render_snapshot_validation,
     render_snapshot_warnings,
 )
+from .versioning import (
+    build_version_comparison,
+    render_version_comparison_json,
+    render_version_comparison_markdown,
+)
 from .watchlists import (
     WatchlistValidationError,
     load_watchlist,
@@ -141,6 +146,24 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     watchlist_check_parser.add_argument("--out", dest="output_path", help="Optional output path for the rendered report")
     watchlist_check_parser.set_defaults(handler=_watchlist_check)
+
+    version_parser = subparsers.add_parser("version", help="Schema version comparison")
+    version_subparsers = version_parser.add_subparsers(dest="version_command", required=True)
+
+    version_compare_parser = version_subparsers.add_parser(
+        "compare", help="Compare two local snapshots for version, content, and semantic changes"
+    )
+    version_compare_parser.add_argument("--old", required=True, dest="old_snapshot", help="Path to old snapshot")
+    version_compare_parser.add_argument("--new", required=True, dest="new_snapshot", help="Path to new snapshot")
+    version_compare_parser.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["markdown", "json"],
+        default="markdown",
+        help="Output format",
+    )
+    version_compare_parser.add_argument("--out", dest="output_path", help="Optional output path for the report")
+    version_compare_parser.set_defaults(handler=_version_compare)
 
     return parser
 
@@ -270,6 +293,19 @@ def _watchlist_check(args: argparse.Namespace) -> int:
         _write_output_file(Path(args.output_path), report + "\n")
         return 0
     print(report)
+    return 0
+
+
+def _version_compare(args: argparse.Namespace) -> int:
+    comparison = build_version_comparison(args.old_snapshot, args.new_snapshot)
+    if args.output_format == "json":
+        result = render_version_comparison_json(comparison)
+    else:
+        result = render_version_comparison_markdown(comparison)
+    if args.output_path:
+        _write_output_file(Path(args.output_path), result + "\n")
+        return 0
+    print(result)
     return 0
 
 
