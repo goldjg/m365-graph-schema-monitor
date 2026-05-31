@@ -27,3 +27,4 @@ validation before shaping, planning, execution, or validation decisions.
 - Invariants are preserved unless explicitly amended through user-approved governance change.
 - In PR2, outbound network crossing is limited to the fixed Graph metadata boundary only; no authentication flows, tenant interactions, or dynamic URLs are permitted.
 - In PR7, `fetch-auth` extends the Graph metadata boundary to include an `Authorization` header carrying a caller-supplied access token; the network endpoint remains fixed and URL behaviour is unchanged.
+- In PR8, `compare-sources` reads authenticated sidecar provenance extra fields (`source_kind`, `auth_mode`, `tenant_label`) from local `.xml.json` files via `json.loads()`; this is within the existing local sidecar input surface and requires no new trust boundary.

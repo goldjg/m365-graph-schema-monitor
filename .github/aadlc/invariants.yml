@@ -65,6 +65,15 @@ invariants:
       committed file.
     severity: critical
 
+  - id: source-comparison-local-only
+    name: Source comparison is local-only
+    rule: >
+      Public-vs-authenticated source comparison must use only local snapshots,
+      adjacent validated sidecars, and existing version comparison output. It
+      must not introduce network calls, authentication, token handling, tenant
+      discovery, or external correlation.
+    severity: high
+
   - id: invariant-amendment-governance
     name: Invariant amendment governance
     rule: Agents must preserve invariants unless the user explicitly amends the invariant or opens a separate governance change.
